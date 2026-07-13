@@ -1,1 +1,1 @@
-# StreamMii-Plugin
+# StreamMii

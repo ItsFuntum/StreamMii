@@ -1,0 +1,48 @@
+# Build output
+build/
+dist/
+out/
+
+# Object files
+*.o
+*.d
+*.elf
+
+# Wii U binaries
+*.rpx
+*.wps
+*.wuhb
+
+# Libraries
+*.a
+*.so
+
+# Debug symbols
+*.map
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# VS Code
+.vscode/
+
+# CLion / JetBrains
+.idea/
+cmake-build-*/
+
+# Visual Studio
+.vs/
+
+# Vim
+*.swp
+*.swo
+
+# Temporary files
+*~
