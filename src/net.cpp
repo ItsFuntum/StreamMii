@@ -28,8 +28,12 @@ struct PacketHeader
     uint16_t height;
     uint16_t pitch;
 
-    uint32_t frameSize;
+    uint32_t compressedSize;
+    uint32_t originalSize;
+
     uint16_t payloadSize;
+
+    uint8_t compression;
 };
 #pragma pack(pop)
 
@@ -99,7 +103,7 @@ bool Init(const char *ip, uint16_t port)
 }
 
 
-bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t height, uint32_t pitch)
+bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t height, uint32_t pitch, Compression compression)
 {
     if(socket_fd < 0)
         return false;
@@ -119,6 +123,14 @@ bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t heigh
         (size + MAX_PAYLOAD - 1) / MAX_PAYLOAD;
 
     uint8_t packet[sizeof(PacketHeader)+MAX_PAYLOAD];
+
+    DEBUG_FUNCTION_LINE(
+        "Frame %u compressed %u -> %u bytes packets=%u",
+        frame,
+        size,
+        width * height * 2,
+        packets
+    );
 
     for(uint16_t i = 0; i < packets; i++)
     {
@@ -143,8 +155,11 @@ bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t heigh
         header.height = htons(height);
         header.pitch = htons(pitch);
 
-        header.frameSize = htonl(size);
+        header.compressedSize = htonl(size);
+        header.originalSize = htonl(width * height * 2);
+
         header.payloadSize = htons(payload);
+        header.compression = static_cast<uint8_t>(compression);
 
 
         memcpy(packet, &header, sizeof(header));

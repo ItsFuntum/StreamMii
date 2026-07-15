@@ -22,7 +22,7 @@ WUMS_ROOT := $(DEVKITPRO)/wums
 #-------------------------------------------------------------------------------
 TARGET		:=	StreamMii
 BUILD		:=	build
-SOURCES		:=	src src/utils
+SOURCES		:=	src src/utils src/libs
 DATA		:=	data
 INCLUDES	:=	src
 

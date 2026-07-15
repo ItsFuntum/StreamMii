@@ -3,6 +3,9 @@ import struct
 import numpy as np
 import cv2
 import time
+import lz4.block
+
+HEADER_SIZE = 29
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -36,18 +39,18 @@ while True:
         frames.pop(oldest, None)
         frame_times.pop(oldest, None)
 
-    header = packet[:24]
-    payload = packet[24:]
+    header = packet[:HEADER_SIZE]
+    payload = packet[HEADER_SIZE:]
 
-    magic, frame, index, count, width, height, pitch, frameSize, payloadSize = struct.unpack("!IIHHHHHIH", header)
+    magic, frame, index, count, width, height, pitch, compressedSize, originalSize, payloadSize, compression = struct.unpack("!IIHHHHHIIHB", header)
 
-    payload = packet[24:24 + payloadSize]
+    payload = packet[HEADER_SIZE:HEADER_SIZE+payloadSize]
 
     if len(payload) != payloadSize:
         print("Bad packet")
         continue
 
-    if len(packet) < 24:
+    if len(packet) < HEADER_SIZE:
         print("Short packet")
         continue
 
@@ -64,18 +67,26 @@ while True:
 
         raw = b''.join(frames[frame])
 
+        if compression == 1:
+            raw = lz4.block.decompress(
+                raw,
+                uncompressed_size=originalSize
+            )
+
         print(
-            "Frame",
+            "Frame:",
             frame,
-            "size",
-            len(raw),
-            "expected",
-            frameSize,
-            "pitch",
-            pitch
+            "Width:",
+            width,
+            "Height:",
+            height,
+            "Original Size:",
+            originalSize,
+            "compressed Size:",
+            compressedSize,
         )
 
-        if len(raw) != frameSize:
+        if len(raw) != originalSize:
             print("Incomplete frame")
             del frames[frame]
             continue

@@ -24,28 +24,12 @@ static GX2ColorBuffer sCaptureBuffer = {};
 static StoredBuffer sTVBuffer;
 static StoredBuffer sDRCBuffer;
 
-static void *lastSource = nullptr;
-static uint32_t lastWidth = 0;
-static uint32_t lastHeight = 0;
-
-static constexpr uint32_t BUFFER_COUNT = 2;
+static constexpr uint32_t BUFFER_COUNT = 4;
 
 static uint8_t *sFrameCopies[BUFFER_COUNT] = {};
 static bool sFrameUsed[BUFFER_COUNT] = {};
 
 static uint8_t frameSkip = 0;
-
-// Capture every Nth frame.
-// Assuming a 60 FPS game:
-// 1 = 60 FPS
-// 2 = 30 FPS
-// 3 = 20 FPS
-// 4 = 15 FPS
-// 6 = 10 FPS
-static constexpr uint8_t FRAME_SKIP = 6;
-static constexpr uint32_t FRAME_WIDTH = 320;
-static constexpr uint32_t FRAME_HEIGHT = 180;
-static constexpr uint32_t FRAME_SIZE = FRAME_WIDTH * FRAME_HEIGHT * 2;
 
 static bool initialized = false;
 
@@ -261,25 +245,6 @@ void CaptureFrame(const GX2ColorBuffer *colorBuffer)
     if(colorBuffer->surface.width == 0 || colorBuffer->surface.height == 0)
     {
         return;
-    }
-
-    if (lastSource != colorBuffer->surface.image)
-    {
-        DEBUG_FUNCTION_LINE(
-            "Source changed"
-        );
-    
-        lastSource = colorBuffer->surface.image;
-        lastWidth = colorBuffer->surface.width;
-        lastHeight = colorBuffer->surface.height;
-    }
-
-    if (lastWidth != colorBuffer->surface.width || lastHeight != colorBuffer->surface.height)
-    {
-        DEBUG_FUNCTION_LINE("Resolution changed");
-
-        lastWidth = colorBuffer->surface.width;
-        lastHeight = colorBuffer->surface.height;
     }
 
     GX2Invalidate(GX2_INVALIDATE_MODE_CPU, sCaptureBuffer.surface.image, sCaptureBuffer.surface.imageSize);

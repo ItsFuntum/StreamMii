@@ -7,6 +7,12 @@ namespace StreamMii
 namespace Net
 {
 
+enum class Compression : uint8_t
+{
+    None = 0,
+    LZ4 = 1
+};
+
 bool Init(const char *ip, uint16_t port);
 
 bool SendFrame(
@@ -14,7 +20,8 @@ bool SendFrame(
     uint32_t size,
     uint32_t width,
     uint32_t height,
-    uint32_t pitch);
+    uint32_t pitch,
+    Compression compression);
 
 void Shutdown();
 

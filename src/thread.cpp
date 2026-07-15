@@ -2,6 +2,7 @@
 #include "net.hpp"
 #include "capture.hpp"
 #include "utils/logger.h"
+#include "libs/lz4.h"
 
 #include <memory/mappedmemory.h>
 #include <coreinit/thread.h>
@@ -28,6 +29,10 @@ static bool framePoolUsed[QUEUE_SIZE];
 static bool running = false;
 
 constexpr uint32_t STACK_SIZE = 64 * 1024;
+
+static constexpr uint32_t MAX_COMPRESSED_SIZE = FRAME_SIZE + (FRAME_SIZE / 255) + 16;
+
+static uint8_t compressedBuffer[MAX_COMPRESSED_SIZE];
 
 static FrameMessage *AllocateFrameMessage()
 {
@@ -74,13 +79,32 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
 
             FrameMessage *frame = (FrameMessage *)msg.message;
 
-            Net::SendFrame(
-                frame->buffer,
+            int compressedSize = LZ4_compress_default(
+                (const char *)frame->buffer,
+                (char *)compressedBuffer,
                 frame->size,
-                frame->width,
-                frame->height,
-                frame->pitch
+                sizeof(compressedBuffer)
             );
+
+
+            if(compressedSize > 0)
+            {
+                Net::SendFrame(
+                    compressedBuffer,
+                    compressedSize,
+                    frame->width,
+                    frame->height,
+                    frame->pitch,
+                    Net::Compression::LZ4
+
+                );
+            }
+            else
+            {
+                DEBUG_FUNCTION_LINE(
+                    "LZ4 compression failed"
+                );
+            }
 
             ReleaseBuffer(frame->buffer);
 
@@ -144,7 +168,7 @@ bool InitThread()
         nullptr,
         networkStack + STACK_SIZE,
         STACK_SIZE,
-        1,
+        21,
         OS_THREAD_ATTRIB_AFFINITY_ANY))
     {
         DEBUG_FUNCTION_LINE(
