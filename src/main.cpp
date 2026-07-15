@@ -46,6 +46,6 @@ ON_APPLICATION_REQUESTS_EXIT()
 
 DEINITIALIZE_PLUGIN()
 {
-    deinitLogging();
     DEBUG_FUNCTION_LINE("StreamMii deinitialized");
+    deinitLogging();
 }
