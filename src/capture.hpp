@@ -4,18 +4,6 @@
 
 namespace StreamMii {
 
-// Capture every Nth frame.
-// Assuming a 60 FPS game:
-// 1 = 60 FPS
-// 2 = 30 FPS
-// 3 = 20 FPS
-// 4 = 15 FPS
-// 6 = 10 FPS
-static constexpr uint8_t FRAME_SKIP = 3;
-static constexpr uint32_t FRAME_WIDTH = 320;
-static constexpr uint32_t FRAME_HEIGHT = 180;
-static constexpr uint32_t FRAME_SIZE = FRAME_WIDTH * FRAME_HEIGHT * 2;
-
 struct StoredBuffer {
     void *buffer = nullptr;
     uint32_t buffer_size = 0;

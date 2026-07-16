@@ -3,6 +3,7 @@
 #include "capture.hpp"
 #include "net.hpp"
 #include "thread.hpp"
+#include "config.hpp"
 
 #include <wups.h>
 
@@ -20,6 +21,8 @@ WUPS_USE_STORAGE("streammii");
 
 INITIALIZE_PLUGIN()
 {
+    StreamMii::InitConfig();
+
     initLogging();
     DEBUG_FUNCTION_LINE("StreamMii initialized");
 }
@@ -28,7 +31,7 @@ ON_APPLICATION_START()
 {
     DEBUG_FUNCTION_LINE("Application start");
 
-    StreamMii::Net::Init("192.168.1.1", 4242); // Local PC IP Address and Port
+    StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
 
     StreamMii::InitThread();
 

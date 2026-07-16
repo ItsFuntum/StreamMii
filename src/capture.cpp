@@ -1,6 +1,7 @@
 #include "capture.hpp"
 #include "net.hpp"
 #include "thread.hpp"
+#include "config.hpp"
 #include "utils/logger.h"
 
 #include <gx2/surface.h>
@@ -63,8 +64,8 @@ static bool CreateCaptureBuffer(GX2ColorBuffer &buffer)
 {
     buffer.surface = {};
 
-    buffer.surface.width = FRAME_WIDTH;
-    buffer.surface.height = FRAME_HEIGHT;
+    buffer.surface.width = gWidth;
+    buffer.surface.height = gHeight;
     buffer.surface.depth = 1;
 
     buffer.surface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
@@ -151,7 +152,7 @@ void InitCapture()
     {
         sFrameCopies[i] =
             (uint8_t*)MEMAllocFromMappedMemoryForGX2Ex(
-                FRAME_SIZE,
+                gWidth * gHeight * 2,
                 0x100
             );
 
@@ -208,10 +209,21 @@ void ShutdownCapture()
 
 void CaptureFrame(const GX2ColorBuffer *colorBuffer)
 {
+    if(!gEnabled)
+        return;
+
     frameSkip++;
 
-    if(frameSkip % FRAME_SKIP)
+    if(frameSkip % gFrameSkip)
         return;
+
+    if(gResolutionChanged)
+    {
+        ShutdownCapture();
+        InitCapture();
+
+        gResolutionChanged = false;
+    }
 
     if (!colorBuffer)
     {
@@ -319,22 +331,22 @@ void CaptureFrame(const GX2ColorBuffer *colorBuffer)
 
     uint16_t *dst = (uint16_t *)buffer;
 
-    for(uint32_t y = 0; y < FRAME_HEIGHT; y++)
+    for(uint32_t y = 0; y < gHeight; y++)
     {
         memcpy(
-            dst + y * FRAME_WIDTH,
+            dst + y * gWidth,
             src + y * sCaptureBuffer.surface.pitch,
-            FRAME_WIDTH * sizeof(uint16_t)
+            gWidth * sizeof(uint16_t)
         );
     }
 
     FrameMessage msg;
 
     msg.buffer = buffer;
-    msg.size = FRAME_WIDTH * FRAME_HEIGHT * 2;
-    msg.width = FRAME_WIDTH;
-    msg.height = FRAME_HEIGHT;
-    msg.pitch = FRAME_WIDTH * sizeof(uint16_t);
+    msg.size = gWidth * gHeight * 2;
+    msg.width = gWidth;
+    msg.height = gHeight;
+    msg.pitch = gWidth * sizeof(uint16_t);
 
     if(!QueueFrame(msg))
     {

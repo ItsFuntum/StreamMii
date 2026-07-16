@@ -16,6 +16,8 @@ struct FrameMessage
     uint16_t pitch;
 };
 
+void RequestReconnect();
+
 bool InitThread();
 void ShutdownThread();
 

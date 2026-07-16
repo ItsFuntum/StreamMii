@@ -1,6 +1,7 @@
 #include "thread.hpp"
 #include "net.hpp"
 #include "capture.hpp"
+#include "config.hpp"
 #include "utils/logger.h"
 #include "libs/lz4.h"
 
@@ -30,14 +31,15 @@ static bool running = false;
 
 constexpr uint32_t STACK_SIZE = 64 * 1024;
 
-static constexpr uint32_t MAX_COMPRESSED_SIZE = FRAME_SIZE + (FRAME_SIZE / 255) + 16;
+static constexpr uint32_t MAX_FRAME_SIZE = 854 * 480 * 2;
+static constexpr uint32_t MAX_COMPRESSED_SIZE = MAX_FRAME_SIZE + (MAX_FRAME_SIZE / 255) + 16;
 
 static uint8_t compressedBuffer[MAX_COMPRESSED_SIZE];
 
 static uint32_t frameCounter = 0;
 
-static uint8_t previousFrame[FRAME_SIZE];
-static uint8_t deltaFrame[FRAME_SIZE];
+static uint8_t previousFrame[MAX_FRAME_SIZE];
+static uint8_t deltaFrame[MAX_FRAME_SIZE];
 static bool havePrevious = false;
 
 static FrameMessage *AllocateFrameMessage()
@@ -54,6 +56,18 @@ static FrameMessage *AllocateFrameMessage()
     return nullptr;
 }
 
+
+void RequestReconnect()
+{
+    OSMessage msg = {};
+    msg.message = (void *)1;
+
+    OSSendMessage(
+        &queue,
+        &msg,
+        OS_MESSAGE_FLAGS_NONE
+    );
+}
 
 static void FreeFrameMessage(FrameMessage *msg)
 {
@@ -83,6 +97,21 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
             if(msg.message == nullptr)
                 break;
 
+
+            if(msg.message == (void *)1)
+            {
+                DEBUG_FUNCTION_LINE("Reconnecting network");
+
+                Net::Shutdown();
+                Net::Init(gIP, gPort);
+
+                havePrevious = false;
+                frameCounter = 0;
+
+                continue;
+            }
+
+
             FrameMessage *frame = (FrameMessage *)msg.message;
 
             const uint8_t *current = static_cast<const uint8_t *>(frame->buffer);
@@ -91,25 +120,28 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
 
             Net::Compression compression = Net::Compression::LZ4;
 
-            bool keyframe = !havePrevious || (frameCounter % 120 == 0);
+            bool keyframe = !havePrevious || (frameCounter % gKeyframeInterval == 0);
 
             frameCounter++;
 
-            if(!keyframe)
+            if(gDeltaEnabled && !keyframe)
             {
                 auto *cur  = reinterpret_cast<const uint16_t*>(current);
                 auto *prev = reinterpret_cast<const uint16_t*>(previousFrame);
                 auto *dst  = reinterpret_cast<uint16_t*>(deltaFrame);
 
-                for (uint32_t i = 0; i < frame->size / 2; i++)
+                for(uint32_t i = 0; i < frame->size / 2; i++)
+                {
                     dst[i] = cur[i] ^ prev[i];
+                }
 
                 input = deltaFrame;
                 compression = Net::Compression::DeltaLZ4;
             }
             else
             {
-                havePrevious = true;
+                keyframe = true;
+                compression = Net::Compression::LZ4;
             }
 
             int compressedSize = LZ4_compress_default(
@@ -133,6 +165,7 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
                 ))
                 {
                     memcpy(previousFrame, current, frame->size);
+                    havePrevious = true;
                 };
             }
             else
