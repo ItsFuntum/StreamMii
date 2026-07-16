@@ -5,7 +5,7 @@ import cv2
 import time
 import lz4.block
 
-HEADER_SIZE = 29
+HEADER_SIZE = 30
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -19,6 +19,11 @@ print("Listening")
 
 frames = {}
 frame_times = {}
+
+previous_frame = None
+
+bytes_received = 0
+last_stat_time = time.time()
 
 while True:
     try:
@@ -34,6 +39,8 @@ while True:
 
         continue
 
+    bytes_received += len(packet)
+
     if len(frames) > 10:
         oldest = min(frames.keys())
         frames.pop(oldest, None)
@@ -42,7 +49,7 @@ while True:
     header = packet[:HEADER_SIZE]
     payload = packet[HEADER_SIZE:]
 
-    magic, frame, index, count, width, height, pitch, compressedSize, originalSize, payloadSize, compression = struct.unpack("!IIHHHHHIIHB", header)
+    magic, frame, index, count, width, height, pitch, compressedSize, originalSize, payloadSize, compression, keyframe = struct.unpack("!IIHHHHHIIHBB", header)
 
     payload = packet[HEADER_SIZE:HEADER_SIZE+payloadSize]
 
@@ -67,11 +74,54 @@ while True:
 
         raw = b''.join(frames[frame])
 
-        if compression == 1:
+        if compression == 0:
+            pass
+
+        elif compression == 1:  # LZ4 full frame/keyframe
             raw = lz4.block.decompress(
                 raw,
                 uncompressed_size=originalSize
             )
+
+            if keyframe:
+                previous_frame = raw
+
+        elif compression == 2:  # Delta LZ4
+            if previous_frame is None:
+                print("Waiting for keyframe")
+                del frames[frame]
+                del frame_times[frame]
+                continue
+
+            raw = lz4.block.decompress(
+                raw,
+                uncompressed_size=originalSize
+            )
+
+            delta = np.frombuffer(raw, dtype=np.uint8)
+            previous = np.frombuffer(previous_frame, dtype=np.uint8)
+
+            raw = np.bitwise_xor(delta, previous).tobytes()
+
+            previous_frame = raw
+
+        else:
+            print("Unknown compression:", compression)
+            del frames[frame]
+            del frame_times[frame]
+            continue
+
+        now = time.time()
+
+        if now - last_stat_time >= 1.0:
+            elapsed = now - last_stat_time
+
+            mbps = bytes_received * 8 / elapsed / 1_000_000.0
+
+            print(f"{mbps:.2f} Mb/s")
+
+            bytes_received = 0
+            last_stat_time = now
 
         print(
             "Frame:",

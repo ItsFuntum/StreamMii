@@ -24,7 +24,7 @@ static GX2ColorBuffer sCaptureBuffer = {};
 static StoredBuffer sTVBuffer;
 static StoredBuffer sDRCBuffer;
 
-static constexpr uint32_t BUFFER_COUNT = 4;
+static constexpr uint32_t BUFFER_COUNT = 2;
 
 static uint8_t *sFrameCopies[BUFFER_COUNT] = {};
 static bool sFrameUsed[BUFFER_COUNT] = {};

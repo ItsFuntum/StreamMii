@@ -34,6 +34,7 @@ struct PacketHeader
     uint16_t payloadSize;
 
     uint8_t compression;
+    uint8_t keyframe;
 };
 #pragma pack(pop)
 
@@ -103,7 +104,7 @@ bool Init(const char *ip, uint16_t port)
 }
 
 
-bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t height, uint32_t pitch, Compression compression)
+bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t height, uint32_t pitch, Compression compression, bool keyframe)
 {
     if(socket_fd < 0)
         return false;
@@ -160,6 +161,7 @@ bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t heigh
 
         header.payloadSize = htons(payload);
         header.compression = static_cast<uint8_t>(compression);
+        header.keyframe = keyframe ? 1 : 0;
 
 
         memcpy(packet, &header, sizeof(header));

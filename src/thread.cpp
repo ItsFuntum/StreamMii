@@ -20,7 +20,7 @@ static uint8_t *networkStack = nullptr;
 
 static OSMessageQueue queue;
 
-static constexpr uint32_t QUEUE_SIZE = 8;
+static constexpr uint32_t QUEUE_SIZE = 2;
 static OSMessage messages[QUEUE_SIZE];
 
 static FrameMessage framePool[QUEUE_SIZE];
@@ -33,6 +33,12 @@ constexpr uint32_t STACK_SIZE = 64 * 1024;
 static constexpr uint32_t MAX_COMPRESSED_SIZE = FRAME_SIZE + (FRAME_SIZE / 255) + 16;
 
 static uint8_t compressedBuffer[MAX_COMPRESSED_SIZE];
+
+static uint32_t frameCounter = 0;
+
+static uint8_t previousFrame[FRAME_SIZE];
+static uint8_t deltaFrame[FRAME_SIZE];
+static bool havePrevious = false;
 
 static FrameMessage *AllocateFrameMessage()
 {
@@ -79,8 +85,35 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
 
             FrameMessage *frame = (FrameMessage *)msg.message;
 
+            const uint8_t *current = static_cast<const uint8_t *>(frame->buffer);
+
+            const uint8_t *input = current;
+
+            Net::Compression compression = Net::Compression::LZ4;
+
+            bool keyframe = !havePrevious || (frameCounter % 120 == 0);
+
+            frameCounter++;
+
+            if(!keyframe)
+            {
+                auto *cur  = reinterpret_cast<const uint16_t*>(current);
+                auto *prev = reinterpret_cast<const uint16_t*>(previousFrame);
+                auto *dst  = reinterpret_cast<uint16_t*>(deltaFrame);
+
+                for (uint32_t i = 0; i < frame->size / 2; i++)
+                    dst[i] = cur[i] ^ prev[i];
+
+                input = deltaFrame;
+                compression = Net::Compression::DeltaLZ4;
+            }
+            else
+            {
+                havePrevious = true;
+            }
+
             int compressedSize = LZ4_compress_default(
-                (const char *)frame->buffer,
+                (const char *)input,
                 (char *)compressedBuffer,
                 frame->size,
                 sizeof(compressedBuffer)
@@ -89,18 +122,23 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
 
             if(compressedSize > 0)
             {
-                Net::SendFrame(
+                if (Net::SendFrame(
                     compressedBuffer,
                     compressedSize,
                     frame->width,
                     frame->height,
                     frame->pitch,
-                    Net::Compression::LZ4
-
-                );
+                    compression,
+                    keyframe
+                ))
+                {
+                    memcpy(previousFrame, current, frame->size);
+                };
             }
             else
             {
+                havePrevious = false;
+
                 DEBUG_FUNCTION_LINE(
                     "LZ4 compression failed"
                 );
@@ -208,6 +246,7 @@ void ShutdownThread()
 
 
     running = false;
+    havePrevious = false;
 
 
     OSMessage msg = {};
