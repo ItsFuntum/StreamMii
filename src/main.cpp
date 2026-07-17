@@ -21,15 +21,20 @@ WUPS_USE_STORAGE("streammii");
 
 INITIALIZE_PLUGIN()
 {
+    initLogging();
+
     StreamMii::InitConfig();
 
-    initLogging();
     DEBUG_FUNCTION_LINE("StreamMii initialized");
+
+    deinitLogging();
 }
 
 ON_APPLICATION_START()
 {
-    DEBUG_FUNCTION_LINE("Application start");
+    initLogging();
+
+    DEBUG_FUNCTION_LINE("Application starting");
 
     StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
 
@@ -38,17 +43,17 @@ ON_APPLICATION_START()
     StreamMii::InitCapture();
 }
 
-ON_APPLICATION_REQUESTS_EXIT()
-{
-    StreamMii::ShutdownThread();
-
-    StreamMii::ShutdownCapture();
-
-    StreamMii::Net::Shutdown();
+ON_APPLICATION_ENDS() {
+    deinitLogging();
 }
 
-DEINITIALIZE_PLUGIN()
+ON_APPLICATION_REQUESTS_EXIT()
 {
-    DEBUG_FUNCTION_LINE("StreamMii deinitialized");
-    deinitLogging();
+    DEBUG_FUNCTION_LINE("Application exiting");
+
+    StreamMii::ShutdownCapture();
+    
+    StreamMii::ShutdownThread();
+
+    StreamMii::Net::Shutdown();
 }
