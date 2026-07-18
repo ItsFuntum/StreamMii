@@ -67,13 +67,13 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
 
             if(gDeltaEnabled && !keyframe)
             {
-                auto *cur = reinterpret_cast<const uint16_t*>(current);
+                const uint32_t *cur = reinterpret_cast<const uint32_t*>(frame.buffer);
 
-                auto *prev = reinterpret_cast<const uint16_t*>(previousFrame);
+                const uint32_t *prev = reinterpret_cast<const uint32_t*>(previousFrame);
 
-                auto *dst = reinterpret_cast<uint16_t*>(deltaFrame);
+                uint32_t *dst = reinterpret_cast<uint32_t*>(deltaFrame);
 
-                for(uint32_t i = 0; i < frame.size / 2; i++)
+                for(uint32_t i = 0; i < frame.size / sizeof(uint32_t); ++i)
                 {
                     dst[i] = cur[i] ^ prev[i];
                 }
