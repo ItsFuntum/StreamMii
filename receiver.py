@@ -24,6 +24,10 @@ previous_frame = None
 
 bytes_received = 0
 last_stat_time = time.time()
+mbps = 0
+
+frames_received = 0
+last_fps_time = time.time()
 
 while True:
     try:
@@ -93,6 +97,11 @@ while True:
                 del frame_times[frame]
                 continue
 
+            if len(previous_frame) != originalSize:
+                print("Previous frame size mismatch, waiting for keyframe")
+                previous_frame = None
+                continue
+
             raw = lz4.block.decompress(
                 raw,
                 uncompressed_size=originalSize
@@ -117,8 +126,6 @@ while True:
             elapsed = now - last_stat_time
 
             mbps = bytes_received * 8 / elapsed / 1_000_000.0
-
-            print(f"{mbps:.2f} Mb/s")
 
             bytes_received = 0
             last_stat_time = now
@@ -158,6 +165,18 @@ while True:
         b = (b << 3) | (b >> 2)
 
         image = np.stack((b, g, r), axis=-1)
+
+        frames_received += 1
+
+        now = time.time()
+
+        if now - last_fps_time >= 1.0:
+            fps = frames_received / (now - last_fps_time)
+
+            print(f"{mbps:.2f} Mb/s | FPS: {fps:.1f}")
+
+            frames_received = 0
+            last_fps_time = now
 
         cv2.imshow("StreamMii", image)
 
