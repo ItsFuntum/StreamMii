@@ -7,7 +7,6 @@
 
 #include <memory/mappedmemory.h>
 #include <coreinit/thread.h>
-#include <coreinit/messagequeue.h>
 
 #include <malloc.h>
 #include <string.h>
@@ -18,14 +17,6 @@ namespace StreamMii
 
 static OSThread *networkThread = nullptr;
 static uint8_t *networkStack = nullptr;
-
-static OSMessageQueue queue;
-
-static constexpr uint32_t QUEUE_SIZE = 2;
-static OSMessage messages[QUEUE_SIZE];
-
-static FrameMessage framePool[QUEUE_SIZE];
-static bool framePoolUsed[QUEUE_SIZE];
 
 static bool running = false;
 
@@ -42,79 +33,29 @@ static uint8_t previousFrame[MAX_FRAME_SIZE];
 static uint8_t deltaFrame[MAX_FRAME_SIZE];
 static bool havePrevious = false;
 
-static FrameMessage *AllocateFrameMessage()
-{
-    for(uint32_t i = 0; i < QUEUE_SIZE; i++)
-    {
-        if(!framePoolUsed[i])
-        {
-            framePoolUsed[i] = true;
-            return &framePool[i];
-        }
-    }
-
-    return nullptr;
-}
-
-
-void RequestReconnect()
-{
-    OSMessage msg = {};
-    msg.message = (void *)1;
-
-    OSSendMessage(
-        &queue,
-        &msg,
-        OS_MESSAGE_FLAGS_NONE
-    );
-}
-
-static void FreeFrameMessage(FrameMessage *msg)
-{
-    for(uint32_t i = 0; i < QUEUE_SIZE; i++)
-    {
-        if(&framePool[i] == msg)
-        {
-            framePoolUsed[i] = false;
-            return;
-        }
-    }
-}
 
 static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
 {
-    DEBUG_FUNCTION_LINE(
-        "Network thread started"
-    );
-
-    OSMessage msg;
-
+    DEBUG_FUNCTION_LINE("Network thread started");
 
     while(running)
     {
-        if(OSReceiveMessage(&queue, &msg, OS_MESSAGE_FLAGS_BLOCKING))
+        if(gNetworkChanged)
         {
-            if(msg.message == nullptr)
-                break;
+            gNetworkChanged = false;
 
+            Net::Shutdown();
+            Net::Init(gIP, gPort);
 
-            if(msg.message == (void *)1)
-            {
-                DEBUG_FUNCTION_LINE("Reconnecting network");
+            havePrevious = false;
+            frameCounter = 0;
+        }
 
-                Net::Shutdown();
-                Net::Init(gIP, gPort);
+        FrameMessage frame;
 
-                havePrevious = false;
-                frameCounter = 0;
-
-                continue;
-            }
-
-
-            FrameMessage *frame = (FrameMessage *)msg.message;
-
-            const uint8_t *current = static_cast<const uint8_t *>(frame->buffer);
+        if(GetLatestFrame(frame))
+        {
+            const uint8_t *current = static_cast<const uint8_t *>(frame.buffer);
 
             const uint8_t *input = current;
 
@@ -126,11 +67,13 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
 
             if(gDeltaEnabled && !keyframe)
             {
-                auto *cur  = reinterpret_cast<const uint16_t*>(current);
-                auto *prev = reinterpret_cast<const uint16_t*>(previousFrame);
-                auto *dst  = reinterpret_cast<uint16_t*>(deltaFrame);
+                auto *cur = reinterpret_cast<const uint16_t*>(current);
 
-                for(uint32_t i = 0; i < frame->size / 2; i++)
+                auto *prev = reinterpret_cast<const uint16_t*>(previousFrame);
+
+                auto *dst = reinterpret_cast<uint16_t*>(deltaFrame);
+
+                for(uint32_t i = 0; i < frame.size / 2; i++)
                 {
                     dst[i] = cur[i] ^ prev[i];
                 }
@@ -141,13 +84,13 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
             else
             {
                 keyframe = true;
-                compression = Net::Compression::LZ4;
             }
+
 
             int compressedSize = LZ4_compress_default(
                 (const char *)input,
                 (char *)compressedBuffer,
-                frame->size,
+                frame.size,
                 sizeof(compressedBuffer)
             );
 
@@ -155,31 +98,33 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
             if(compressedSize > 0)
             {
                 if (Net::SendFrame(
-                    compressedBuffer,
-                    compressedSize,
-                    frame->width,
-                    frame->height,
-                    frame->pitch,
-                    compression,
-                    keyframe
-                ))
+                        compressedBuffer,
+                        compressedSize,
+                        frame.width,
+                        frame.height,
+                        frame.pitch,
+                        compression,
+                        keyframe))
                 {
-                    memcpy(previousFrame, current, frame->size);
+                    memcpy(previousFrame, current, frame.size);
                     havePrevious = true;
-                };
+                }
+                else
+                {
+                    havePrevious = false; // force a keyframe next time
+                }
             }
             else
             {
                 havePrevious = false;
-
-                DEBUG_FUNCTION_LINE(
-                    "LZ4 compression failed"
-                );
             }
 
-            ReleaseBuffer(frame->buffer);
 
-            FreeFrameMessage(frame);
+            ReleaseBuffer(frame.buffer);
+        }
+        else
+        {
+            OSSleepTicks(OSMillisecondsToTicks(1));
         }
     }
 
@@ -200,12 +145,6 @@ bool InitThread()
 
     if(running)
         return true;
-
-    OSInitMessageQueue(
-        &queue,
-        messages,
-        QUEUE_SIZE
-    );
 
     networkThread = (OSThread *)memalign(0x20, sizeof(OSThread));
 
@@ -280,23 +219,13 @@ void ShutdownThread()
 
     running = false;
     havePrevious = false;
+    frameCounter = 0;
 
 
-    OSMessage msg = {};
-    msg.message = nullptr;
-
-
-    OSSendMessage(
-        &queue,
-        &msg,
-        OS_MESSAGE_FLAGS_NONE
-    );
-
-
-    OSJoinThread(
-        networkThread,
-        nullptr
-    );
+    if(networkThread)
+    {
+        OSJoinThread(networkThread, nullptr);
+    }
 
 
     free(networkStack);
@@ -306,41 +235,5 @@ void ShutdownThread()
     networkStack = nullptr;
     networkThread = nullptr;
 }
-
-
-
-bool QueueFrame(const FrameMessage &frame)
-{
-    FrameMessage *copy = AllocateFrameMessage();
-
-    if(!copy)
-    {
-        ReleaseBuffer(frame.buffer);
-        return false;
-    }
-
-    *copy = frame;
-
-    OSMessage msg = {};
-    msg.message = copy;
-
-
-    if(!OSSendMessage(
-        &queue,
-        &msg,
-        OS_MESSAGE_FLAGS_NONE))
-    {
-        DEBUG_FUNCTION_LINE(
-            "Frame queue full"
-        );
-
-        ReleaseBuffer(frame.buffer);
-        FreeFrameMessage(copy);
-        return false;
-    }
-
-    return true;
-}
-
 
 }

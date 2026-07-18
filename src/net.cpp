@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <coreinit/time.h>
 #include <errno.h>
+#include <fcntl.h>
 
 
 namespace StreamMii
@@ -50,6 +51,12 @@ bool Init(const char *ip, uint16_t port)
         IPPROTO_UDP
     );
 
+    if(socket_fd < 0)
+    {
+        DEBUG_FUNCTION_LINE("Socket failed");
+        return false;
+    }
+
     int sndbuf = 512 * 1024;
 
     setsockopt(
@@ -60,11 +67,13 @@ bool Init(const char *ip, uint16_t port)
         sizeof(sndbuf)
     );
 
-    if(socket_fd < 0)
-    {
-        DEBUG_FUNCTION_LINE("Socket failed");
-        return false;
-    }
+    int flags = fcntl(socket_fd, F_GETFL, 0);
+
+    fcntl(
+        socket_fd,
+        F_SETFL,
+        flags | O_NONBLOCK
+    );
 
     memset(
         &destination,
@@ -126,7 +135,7 @@ bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t heigh
     uint8_t packet[sizeof(PacketHeader)+MAX_PAYLOAD];
 
     DEBUG_FUNCTION_LINE(
-        "Frame %u compressed %u -> %u bytes packets=%u",
+        "Frame %u compressed %u/%u bytes packets=%u",
         frame,
         size,
         width * height * 2,
@@ -180,6 +189,12 @@ bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t heigh
 
         if(result < 0)
         {
+            if(errno == EWOULDBLOCK || errno == EAGAIN)
+            {
+                DEBUG_FUNCTION_LINE("UDP buffer full, dropping packet");
+                continue;
+            }
+
             DEBUG_FUNCTION_LINE(
                 "sendto failed errno=%d",
                 errno

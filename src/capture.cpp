@@ -11,6 +11,7 @@
 #include <memory/mappedmemory.h>
 #include <coreinit/cache.h>
 #include <coreinit/filesystem.h>
+#include <coreinit/mutex.h>
 #include <malloc.h>
 #include <cstdlib>
 #include <cstdio>
@@ -29,6 +30,10 @@ static constexpr uint32_t BUFFER_COUNT = 2;
 
 static uint8_t *sFrameCopies[BUFFER_COUNT] = {};
 static bool sFrameUsed[BUFFER_COUNT] = {};
+
+static FrameMessage latestFrame = {};
+static bool latestReady = false;
+static OSMutex frameMutex;
 
 static uint8_t frameSkip = 0;
 
@@ -113,6 +118,24 @@ static bool CreateCaptureBuffer(GX2ColorBuffer &buffer)
     return true;
 }
 
+bool GetLatestFrame(FrameMessage &out)
+{
+    bool result = false;
+
+    OSLockMutex(&frameMutex);
+
+    if(latestReady)
+    {
+        out = latestFrame;
+        latestReady = false;
+        result = true;
+    }
+
+    OSUnlockMutex(&frameMutex);
+
+    return result;
+}
+
 void SetTVBuffer(void *buffer, uint32_t buffer_size, int32_t mode, GX2SurfaceFormat format, GX2BufferingMode buffering)
 {
     sTVBuffer.buffer = buffer;
@@ -148,6 +171,8 @@ void InitCapture()
     if(initialized)
         return;
 
+    OSInitMutex(&frameMutex);
+
     for(uint32_t i = 0; i < BUFFER_COUNT; i++)
     {
         sFrameCopies[i] =
@@ -179,6 +204,17 @@ void ShutdownCapture()
 {
     if (!initialized)
         return;
+
+    OSLockMutex(&frameMutex);
+
+    if(latestReady)
+    {
+        ReleaseBuffer(latestFrame.buffer);
+        latestReady = false;
+        memset(&latestFrame, 0, sizeof(FrameMessage));
+    }
+
+    OSUnlockMutex(&frameMutex);
 
     for(uint32_t i = 0; i < BUFFER_COUNT; i++)
     {
@@ -348,13 +384,17 @@ void CaptureFrame(const GX2ColorBuffer *colorBuffer)
     msg.height = gHeight;
     msg.pitch = gWidth * sizeof(uint16_t);
 
-    if(!QueueFrame(msg))
+    OSLockMutex(&frameMutex);
+
+    if(latestReady)
     {
-        DEBUG_FUNCTION_LINE(
-            "Queue failed"
-        );
-        ReleaseBuffer(buffer);
+        ReleaseBuffer(latestFrame.buffer);
     }
+
+    latestFrame = msg;
+    latestReady = true;
+
+    OSUnlockMutex(&frameMutex);
 }
 
 }

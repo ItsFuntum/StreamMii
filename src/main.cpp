@@ -18,6 +18,8 @@ WUPS_PLUGIN_LICENSE("MIT");
 WUPS_USE_WUT_DEVOPTAB();
 WUPS_USE_STORAGE("streammii");
 
+static bool initialized = false;
+
 
 INITIALIZE_PLUGIN()
 {
@@ -36,11 +38,22 @@ ON_APPLICATION_START()
 
     DEBUG_FUNCTION_LINE("Application starting");
 
+    if(initialized)
+    {
+        DEBUG_FUNCTION_LINE("Restarting StreamMii for new application");
+
+        StreamMii::ShutdownThread();
+        StreamMii::ShutdownCapture();
+        StreamMii::Net::Shutdown();
+    }
+
     StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
+
+    StreamMii::InitCapture();
 
     StreamMii::InitThread();
 
-    StreamMii::InitCapture();
+    initialized = true;
 }
 
 ON_APPLICATION_ENDS() {
@@ -49,11 +62,16 @@ ON_APPLICATION_ENDS() {
 
 ON_APPLICATION_REQUESTS_EXIT()
 {
+    if(!initialized)
+        return;
+
     DEBUG_FUNCTION_LINE("Application exiting");
 
-    StreamMii::ShutdownCapture();
-    
     StreamMii::ShutdownThread();
+    
+    StreamMii::ShutdownCapture();
 
     StreamMii::Net::Shutdown();
+
+    initialized = false;
 }

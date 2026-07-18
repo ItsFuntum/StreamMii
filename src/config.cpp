@@ -67,7 +67,6 @@ void ipCallback(
     );
 
     gNetworkChanged = true;
-    StreamMii::RequestReconnect();
 }
 
 void resolutionCallback(
@@ -158,7 +157,6 @@ void integerCallback(
     {
         gPort = value;
         gNetworkChanged = true;
-        StreamMii::RequestReconnect();
     }
 
 

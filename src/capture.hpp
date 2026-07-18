@@ -1,5 +1,7 @@
 #pragma once
 
+#include <frame.hpp>
+
 #include <gx2/display.h>
 
 namespace StreamMii {
@@ -13,6 +15,8 @@ struct StoredBuffer {
 };
 
 void ReleaseBuffer(void *buffer);
+
+bool GetLatestFrame(FrameMessage &out);
 
 void SetTVBuffer(
     void *buffer,
