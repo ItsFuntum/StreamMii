@@ -40,7 +40,7 @@ static uint8_t previousFrame[MAX_FRAME_SIZE];
 static uint8_t deltaFrame[MAX_FRAME_SIZE];
 static bool havePrevious = false;
 
-Net::Compression gCompression = Net::Compression::JPEG;
+Net::Compression packetCompression;
 
 
 static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
@@ -72,8 +72,10 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
             frameCounter++;
 
 
-            if(gCompression == Net::Compression::JPEG)
+            if(gCompressionMode == CompressionMode::JPEG)
             {
+                packetCompression = Net::Compression::JPEG;
+
                 unsigned long jpegSize = 0;
 
                 jpegBuffer = nullptr;
@@ -88,7 +90,7 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
                     &jpegBuffer,
                     &jpegSize,
                     TJSAMP_420,
-                    60,
+                    70,
                     TJFLAG_FASTDCT
                 );
 
@@ -113,6 +115,7 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
                 const uint8_t *input = current;
 
                 bool useDelta =
+                    gCompressionMode == CompressionMode::LZ4 &&
                     gDeltaEnabled &&
                     havePrevious &&
                     (frameCounter % gKeyframeInterval != 0);
@@ -133,12 +136,12 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
                     }
 
                     input = deltaFrame;
-                    gCompression = Net::Compression::DeltaLZ4;
+                    packetCompression = Net::Compression::DeltaLZ4;
                     keyframe = false;
                 }
                 else
                 {
-                    gCompression = Net::Compression::LZ4;
+                    packetCompression = Net::Compression::LZ4;
                     keyframe = true;
                 }
 
@@ -155,7 +158,7 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
             if(compressedSize > 0)
             {
                 const uint8_t *output =
-                    (gCompression == Net::Compression::JPEG)
+                    (gCompressionMode == CompressionMode::JPEG)
                     ? jpegBuffer
                     : compressedBuffer;
 
@@ -165,10 +168,10 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
                     frame.width,
                     frame.height,
                     frame.pitch,
-                    gCompression,
+                    packetCompression,
                     keyframe))
                 {
-                    if(gCompression != Net::Compression::JPEG)
+                    if(gCompressionMode != CompressionMode::JPEG)
                     {
                         memcpy(previousFrame, current, frame.size);
                         havePrevious = true;
@@ -179,7 +182,7 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
                     havePrevious = false; // force a keyframe next time
                 }
 
-                if(gCompression == Net::Compression::JPEG)
+                if(gCompressionMode == CompressionMode::JPEG)
                 {
                     if(jpegBuffer)
                     {

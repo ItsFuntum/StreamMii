@@ -34,6 +34,10 @@ uint32_t gPort = 4242;
 
 bool gResolutionChanged = false;
 bool gNetworkChanged = false;
+bool gCompressionChanged = false;
+
+CompressionMode gCompressionMode = CompressionMode::LZ4;
+uint32_t compression = 0;
 
 
 void ConfigMenuClosedCallback()
@@ -118,6 +122,21 @@ void fpsCallback(
     gFrameSkip = value;
 
     WUPSStorageAPI::Store("fps", value);
+}
+
+void compressionCallback(
+    ConfigItemMultipleValues *,
+    uint32_t value
+)
+{
+    gCompressionMode = static_cast<CompressionMode>(value);
+
+    WUPSStorageAPI::Store(
+        "compression",
+        value
+    );
+
+    gCompressionChanged = true;
 }
 
 
@@ -257,6 +276,24 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(
     );
 
 
+    constexpr WUPSConfigItemMultipleValues::ValuePair compressionOptions[] =
+    {
+        {0, "LZ4"},
+        {1, "JPEG"},
+    };
+
+    root.add(
+        WUPSConfigItemMultipleValues::CreateFromValue(
+            "compression",
+            "Compression",
+            0,
+            static_cast<uint32_t>(gCompressionMode),
+            compressionOptions,
+            compressionCallback
+        )
+    );
+
+
     root.add(
         WUPSConfigItemBoolean::Create(
             "delta",
@@ -327,6 +364,14 @@ void InitConfig()
         gFrameSkip,
         (uint32_t)4
     );
+
+    WUPSStorageAPI::GetOrStoreDefault(
+        "compression",
+        compression,
+        (uint32_t)0
+    );
+
+    gCompressionMode = static_cast<CompressionMode>(compression);
 
     WUPSStorageAPI::GetOrStoreDefault(
         "keyframe",

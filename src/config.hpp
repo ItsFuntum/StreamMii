@@ -21,6 +21,15 @@ extern uint32_t gPort;
 
 extern bool gResolutionChanged;
 extern bool gNetworkChanged;
+extern bool gCompressionChanged;
+
+enum class CompressionMode : uint32_t
+{
+    LZ4 = 0,
+    JPEG = 1,
+};
+
+extern CompressionMode gCompressionMode;
 
 
 void InitConfig();

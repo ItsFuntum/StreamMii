@@ -79,9 +79,9 @@ static bool CreateCaptureBuffer(GX2ColorBuffer &buffer)
     buffer.surface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
     buffer.surface.mipLevels = 1;
 
-    switch (gCompression)
+    switch (gCompressionMode)
     {
-        case Net::Compression::JPEG:
+        case CompressionMode::JPEG:
             buffer.surface.format = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
             break;
 
@@ -183,9 +183,9 @@ void InitCapture()
     if(initialized)
         return;
 
-    switch(gCompression)
+    switch(gCompressionMode)
     {
-        case Net::Compression::JPEG:
+        case CompressionMode::JPEG:
             sBytesPerPixel = 4;
             break;
 
@@ -276,12 +276,13 @@ void CaptureFrame(const GX2ColorBuffer *colorBuffer)
     if(frameSkip % gFrameSkip)
         return;
 
-    if(gResolutionChanged)
+    if(gResolutionChanged || gCompressionChanged)
     {
         ShutdownCapture();
         InitCapture();
 
         gResolutionChanged = false;
+        gCompressionChanged = false;
     }
 
     if (!colorBuffer)
