@@ -39,6 +39,9 @@ static uint8_t frameSkip = 0;
 
 static bool initialized = false;
 
+static uint32_t sBytesPerPixel = 4;
+
+
 static uint8_t *GetFreeBuffer()
 {
     for(uint32_t i = 0; i < BUFFER_COUNT; i++)
@@ -76,7 +79,16 @@ static bool CreateCaptureBuffer(GX2ColorBuffer &buffer)
     buffer.surface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
     buffer.surface.mipLevels = 1;
 
-    buffer.surface.format = GX2_SURFACE_FORMAT_UNORM_R5_G6_B5;
+    switch (gCompression)
+    {
+        case Net::Compression::JPEG:
+            buffer.surface.format = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
+            break;
+
+        default:
+            buffer.surface.format = GX2_SURFACE_FORMAT_UNORM_R5_G6_B5;
+            break;
+    }
 
     buffer.surface.aa = GX2_AA_MODE1X;
 
@@ -171,13 +183,24 @@ void InitCapture()
     if(initialized)
         return;
 
+    switch(gCompression)
+    {
+        case Net::Compression::JPEG:
+            sBytesPerPixel = 4;
+            break;
+
+        default:
+            sBytesPerPixel = 2;
+            break;
+    }
+
     OSInitMutex(&frameMutex);
 
     for(uint32_t i = 0; i < BUFFER_COUNT; i++)
     {
         sFrameCopies[i] =
             (uint8_t*)MEMAllocFromMappedMemoryForGX2Ex(
-                gWidth * gHeight * 2,
+                gWidth * gHeight * sBytesPerPixel,
                 0x100
             );
 
@@ -363,26 +386,26 @@ void CaptureFrame(const GX2ColorBuffer *colorBuffer)
         return;
     }
 
-    uint16_t *src = (uint16_t *)sCaptureBuffer.surface.image;
+    uint8_t* src = (uint8_t*)sCaptureBuffer.surface.image;
 
-    uint16_t *dst = (uint16_t *)buffer;
+    uint8_t* dst = (uint8_t*)buffer;
 
     for(uint32_t y = 0; y < gHeight; y++)
     {
         memcpy(
-            dst + y * gWidth,
-            src + y * sCaptureBuffer.surface.pitch,
-            gWidth * sizeof(uint16_t)
+            dst + y * gWidth * sBytesPerPixel,
+            src + y * sCaptureBuffer.surface.pitch * sBytesPerPixel,
+            gWidth * sBytesPerPixel
         );
     }
 
     FrameMessage msg;
 
     msg.buffer = buffer;
-    msg.size = gWidth * gHeight * 2;
+    msg.size = gWidth * gHeight * sBytesPerPixel;
     msg.width = gWidth;
     msg.height = gHeight;
-    msg.pitch = gWidth * sizeof(uint16_t);
+    msg.pitch = gWidth * sBytesPerPixel;
 
     OSLockMutex(&frameMutex);
 

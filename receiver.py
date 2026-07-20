@@ -31,7 +31,7 @@ last_fps_time = time.time()
 
 while True:
     try:
-        packet, addr = sock.recvfrom(8192)
+        packet, addr = sock.recvfrom(65535)
 
     except TimeoutError:
         now = time.time()
@@ -78,7 +78,7 @@ while True:
 
         raw = b''.join(frames[frame])
 
-        if compression == 0:
+        if compression == 0:    # None
             pass
 
         elif compression == 1:  # LZ4 full frame/keyframe
@@ -114,6 +114,18 @@ while True:
 
             previous_frame = raw
 
+        elif compression == 3:  # JPEG
+            image = cv2.imdecode(
+                np.frombuffer(raw, dtype=np.uint8),
+                cv2.IMREAD_COLOR
+            )
+
+            if image is None:
+                print("JPEG decode failed")
+                del frames[frame]
+                del frame_times[frame]
+                continue
+
         else:
             print("Unknown compression:", compression)
             del frames[frame]
@@ -143,28 +155,25 @@ while True:
             compressedSize,
         )
 
-        if len(raw) != originalSize:
-            print("Incomplete frame")
-            del frames[frame]
-            continue
+        if compression != 3:
+            if len(raw) != originalSize:
+                print("Incomplete frame")
+                del frames[frame]
+                continue
 
-        pixels = np.frombuffer(raw, dtype=np.uint16)
+            pixels = np.frombuffer(raw, dtype=np.uint16)
 
-        pixels = pixels.reshape((height, width))
+            pixels = pixels.reshape((height, width))
 
-        # Remove padding pixels
-        pixels = pixels[:, :width]
+            r = (pixels & 0x1F).astype(np.uint8)
+            g = ((pixels >> 5) & 0x3F).astype(np.uint8)
+            b = ((pixels >> 11) & 0x1F).astype(np.uint8)
 
-        # Convert RGB565 to RGB888
-        r = (pixels & 0x1F).astype(np.uint8)
-        g = ((pixels >> 5) & 0x3F).astype(np.uint8)
-        b = ((pixels >> 11) & 0x1F).astype(np.uint8)
+            r = (r << 3) | (r >> 2)
+            g = (g << 2) | (g >> 4)
+            b = (b << 3) | (b >> 2)
 
-        r = (r << 3) | (r >> 2)
-        g = (g << 2) | (g >> 4)
-        b = (b << 3) | (b >> 2)
-
-        image = np.stack((b, g, r), axis=-1)
+            image = np.stack((b, g, r), axis=-1)
 
         frames_received += 1
 

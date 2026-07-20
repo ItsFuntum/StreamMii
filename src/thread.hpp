@@ -1,9 +1,11 @@
 #pragma once
 
-#include <frame.hpp>
+#include <net.hpp>
 
 namespace StreamMii
 {
+
+extern Net::Compression gCompression;
 
 bool InitThread();
 void ShutdownThread();

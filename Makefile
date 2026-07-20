@@ -24,7 +24,7 @@ TARGET		:=	StreamMii
 BUILD		:=	build
 SOURCES		:=	src src/utils src/libs
 DATA		:=	data
-INCLUDES	:=	src
+INCLUDES	:=	src include
 
 #-------------------------------------------------------------------------------
 # options for code generation
@@ -49,13 +49,13 @@ CXXFLAGS += -DDEBUG -DVERBOSE_DEBUG -g
 CFLAGS += -DDEBUG -DVERBOSE_DEBUG -g
 endif
 
-LIBS	:= -lwups -lwut -lmappedmemory
+LIBS	:= -lwups -lwut -lmappedmemory -lturbojpeg -ljpeg
 
 #-------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level
 # containing include and lib
 #-------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(WUPS_ROOT) $(WUT_ROOT) $(WUMS_ROOT)
+LIBDIRS	:= $(PORTLIBS) $(WUPS_ROOT) $(WUT_ROOT) $(WUMS_ROOT) $(CURDIR)/libs
 
 #-------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional

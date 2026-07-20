@@ -3,7 +3,9 @@
 #include "capture.hpp"
 #include "config.hpp"
 #include "utils/logger.h"
-#include "libs/lz4.h"
+
+#include "lz4.h"
+#include <turbojpeg.h>
 
 #include <memory/mappedmemory.h>
 #include <coreinit/thread.h>
@@ -22,16 +24,23 @@ static bool running = false;
 
 constexpr uint32_t STACK_SIZE = 64 * 1024;
 
-static constexpr uint32_t MAX_FRAME_SIZE = 854 * 480 * 2;
+static constexpr uint32_t MAX_FRAME_SIZE = 854 * 480 * 4;
+
 static constexpr uint32_t MAX_COMPRESSED_SIZE = MAX_FRAME_SIZE + (MAX_FRAME_SIZE / 255) + 16;
 
+
 static uint8_t compressedBuffer[MAX_COMPRESSED_SIZE];
+static unsigned char *jpegBuffer = nullptr;
+
+static tjhandle jpegHandle = nullptr;
 
 static uint32_t frameCounter = 0;
 
 static uint8_t previousFrame[MAX_FRAME_SIZE];
 static uint8_t deltaFrame[MAX_FRAME_SIZE];
 static bool havePrevious = false;
+
+Net::Compression gCompression = Net::Compression::JPEG;
 
 
 static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
@@ -57,61 +66,126 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
         {
             const uint8_t *current = static_cast<const uint8_t *>(frame.buffer);
 
-            const uint8_t *input = current;
-
-            Net::Compression compression = Net::Compression::LZ4;
-
-            bool keyframe = !havePrevious || (frameCounter % gKeyframeInterval == 0);
+            int compressedSize = 0;
+            bool keyframe = true;
 
             frameCounter++;
 
-            if(gDeltaEnabled && !keyframe)
+
+            if(gCompression == Net::Compression::JPEG)
             {
-                const uint32_t *cur = reinterpret_cast<const uint32_t*>(frame.buffer);
+                unsigned long jpegSize = 0;
 
-                const uint32_t *prev = reinterpret_cast<const uint32_t*>(previousFrame);
+                jpegBuffer = nullptr;
 
-                uint32_t *dst = reinterpret_cast<uint32_t*>(deltaFrame);
+                int result = tjCompress2(
+                    jpegHandle,
+                    current,
+                    frame.width,
+                    frame.pitch,
+                    frame.height,
+                    TJPF_RGBA,
+                    &jpegBuffer,
+                    &jpegSize,
+                    TJSAMP_420,
+                    60,
+                    TJFLAG_FASTDCT
+                );
 
-                for(uint32_t i = 0; i < frame.size / sizeof(uint32_t); ++i)
+
+                if(result == 0)
                 {
-                    dst[i] = cur[i] ^ prev[i];
+                    compressedSize = jpegSize;
                 }
+                else
+                {
+                    DEBUG_FUNCTION_LINE("JPEG failed: %s", tjGetErrorStr());
 
-                input = deltaFrame;
-                compression = Net::Compression::DeltaLZ4;
+                    if(jpegBuffer)
+                    {
+                        tjFree(jpegBuffer);
+                        jpegBuffer = nullptr;
+                    }
+                }
             }
             else
             {
-                keyframe = true;
+                const uint8_t *input = current;
+
+                bool useDelta =
+                    gDeltaEnabled &&
+                    havePrevious &&
+                    (frameCounter % gKeyframeInterval != 0);
+
+
+                if(useDelta)
+                {
+                    const uint32_t *cur = reinterpret_cast<const uint32_t*>(current);
+
+                    const uint32_t *prev = reinterpret_cast<const uint32_t*>(previousFrame);
+
+                    uint32_t *dst = reinterpret_cast<uint32_t*>(deltaFrame);
+
+
+                    for(uint32_t i = 0; i < frame.size / sizeof(uint32_t); i++)
+                    {
+                        dst[i] = cur[i] ^ prev[i];
+                    }
+
+                    input = deltaFrame;
+                    gCompression = Net::Compression::DeltaLZ4;
+                    keyframe = false;
+                }
+                else
+                {
+                    gCompression = Net::Compression::LZ4;
+                    keyframe = true;
+                }
+
+
+                compressedSize = LZ4_compress_default(
+                    (const char*)input,
+                    (char*)compressedBuffer,
+                    frame.size,
+                    sizeof(compressedBuffer)
+                );
             }
-
-
-            int compressedSize = LZ4_compress_default(
-                (const char *)input,
-                (char *)compressedBuffer,
-                frame.size,
-                sizeof(compressedBuffer)
-            );
 
 
             if(compressedSize > 0)
             {
-                if (Net::SendFrame(
-                        compressedBuffer,
-                        compressedSize,
-                        frame.width,
-                        frame.height,
-                        frame.pitch,
-                        compression,
-                        keyframe))
+                const uint8_t *output =
+                    (gCompression == Net::Compression::JPEG)
+                    ? jpegBuffer
+                    : compressedBuffer;
+
+                if(Net::SendFrame(
+                    output,
+                    compressedSize,
+                    frame.width,
+                    frame.height,
+                    frame.pitch,
+                    gCompression,
+                    keyframe))
                 {
-                    memcpy(previousFrame, current, frame.size);
-                    havePrevious = true;
+                    if(gCompression != Net::Compression::JPEG)
+                    {
+                        memcpy(previousFrame, current, frame.size);
+                        havePrevious = true;
+                    }
                 }
                 else
                 {
                     havePrevious = false; // force a keyframe next time
+                }
+
+                if(gCompression == Net::Compression::JPEG)
+                {
+                    if(jpegBuffer)
+                    {
+                        tjFree(jpegBuffer);
+                        jpegBuffer = nullptr;
+                    }
                 }
             }
             else
@@ -145,6 +219,14 @@ bool InitThread()
 
     if(running)
         return true;
+
+    jpegHandle = tjInitCompress();
+
+    if(!jpegHandle)
+    {
+        DEBUG_FUNCTION_LINE("TurboJPEG init failed");
+        return false;
+    }
 
     networkThread = (OSThread *)memalign(0x20, sizeof(OSThread));
 
@@ -216,24 +298,27 @@ void ShutdownThread()
     if(!running)
         return;
 
-
     running = false;
-    havePrevious = false;
-    frameCounter = 0;
-
 
     if(networkThread)
     {
         OSJoinThread(networkThread, nullptr);
     }
 
+    if(jpegHandle)
+    {
+        tjDestroy(jpegHandle);
+        jpegHandle = nullptr;
+    }
 
     free(networkStack);
     free(networkThread);
 
-
     networkStack = nullptr;
     networkThread = nullptr;
+
+    havePrevious = false;
+    frameCounter = 0;
 }
 
 }

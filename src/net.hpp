@@ -9,9 +9,9 @@ namespace Net
 
 enum class Compression : uint8_t
 {
-    None = 0,
     LZ4 = 1,
-    DeltaLZ4 = 2
+    DeltaLZ4 = 2,
+    JPEG = 3
 };
 
 bool Init(const char *ip, uint16_t port);
