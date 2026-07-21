@@ -151,7 +151,7 @@ while True:
             height,
             "Original Size:",
             originalSize,
-            "compressed Size:",
+            "Compressed Size:",
             compressedSize,
         )
 

@@ -331,7 +331,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(
     root.add(
         WUPSConfigItemBoolean::Create(
             "delta",
-            "Delta encoding",
+            "LZ4 Delta encoding",
             false,
             gDeltaEnabled,
             boolCallback
