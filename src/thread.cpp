@@ -90,7 +90,7 @@ static int32_t NetworkThreadEntry(int32_t argc, const char **argv)
                     &jpegBuffer,
                     &jpegSize,
                     TJSAMP_420,
-                    70,
+                    gJPEGQuality,
                     TJFLAG_FASTDCT
                 );
 

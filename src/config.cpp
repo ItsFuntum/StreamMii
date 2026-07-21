@@ -39,6 +39,8 @@ bool gCompressionChanged = false;
 CompressionMode gCompressionMode = CompressionMode::LZ4;
 uint32_t compression = 0;
 
+uint32_t gJPEGQuality = 70;
+
 
 void ConfigMenuClosedCallback()
 {
@@ -137,6 +139,25 @@ void compressionCallback(
     );
 
     gCompressionChanged = true;
+}
+
+void jpegQualityCallback(
+    ConfigItemIntegerRange *,
+    int32_t value
+)
+{
+    if(value < 10)
+        value = 10;
+
+    if(value > 100)
+        value = 100;
+
+    gJPEGQuality = value;
+
+    WUPSStorageAPI::Store(
+        "jpeg_quality",
+        gJPEGQuality
+    );
 }
 
 
@@ -295,6 +316,19 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(
 
 
     root.add(
+        WUPSConfigItemIntegerRange::Create(
+            "jpeg_quality",
+            "JPEG Quality",
+            70,
+            gJPEGQuality,
+            10,
+            100,
+            jpegQualityCallback
+        )
+    );
+
+
+    root.add(
         WUPSConfigItemBoolean::Create(
             "delta",
             "Delta encoding",
@@ -372,6 +406,12 @@ void InitConfig()
     );
 
     gCompressionMode = static_cast<CompressionMode>(compression);
+
+    WUPSStorageAPI::GetOrStoreDefault(
+        "jpeg_quality",
+        gJPEGQuality,
+        (uint32_t)70
+    );
 
     WUPSStorageAPI::GetOrStoreDefault(
         "keyframe",

@@ -26,10 +26,12 @@ extern bool gCompressionChanged;
 enum class CompressionMode : uint32_t
 {
     LZ4 = 0,
-    JPEG = 1,
+    JPEG = 1
 };
 
 extern CompressionMode gCompressionMode;
+
+extern uint32_t gJPEGQuality;
 
 
 void InitConfig();
