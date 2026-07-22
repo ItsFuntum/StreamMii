@@ -1,5 +1,7 @@
 #pragma once
 
+#include <wups/button_combo/api.h>
+#include <forward_list>
 #include <stdint.h>
 
 namespace StreamMii
@@ -32,6 +34,9 @@ enum class CompressionMode : uint32_t
 extern CompressionMode gCompressionMode;
 
 extern uint32_t gJPEGQuality;
+
+
+extern std::forward_list<WUPSButtonComboAPI::ButtonCombo> sButtonComboInstances;
 
 
 void InitConfig();

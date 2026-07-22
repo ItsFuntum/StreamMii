@@ -2,11 +2,13 @@
 #include "thread.hpp"
 
 #include <wups.h>
+#include <wups/button_combo/api.h>
 #include <wups/config/WUPSConfigCategory.h>
 #include <wups/config/WUPSConfigItemBoolean.h>
 #include <wups/config/WUPSConfigItemIntegerRange.h>
 #include <wups/config/WUPSConfigItemMultipleValues.h>
 #include <wups/storage.h>
+#include <forward_list>
 #include <string.h>
 
 #include "utils/logger.h"
@@ -41,16 +43,18 @@ uint32_t compression = 0;
 
 uint32_t gJPEGQuality = 70;
 
+std::forward_list<WUPSButtonComboAPI::ButtonCombo> sButtonComboInstances;
+
+WUPSButtonCombo_ComboHandle gDecreaseResolutionComboHandle;
+WUPSButtonCombo_ComboHandle gIncreaseResolutionComboHandle;
+
 
 void ConfigMenuClosedCallback()
 {
     WUPSStorageAPI::SaveStorage();
 }
 
-void ipCallback(
-    ConfigItemIntegerRange *,
-    int32_t value
-)
+void ipCallback(ConfigItemIntegerRange *, int32_t value)
 {
     if(value < 1)
         value = 1;
@@ -67,19 +71,16 @@ void ipCallback(
         gIPLastOctet
     );
 
-    WUPSStorageAPI::Store(
-        "ip",
-        gIPLastOctet
-    );
+    WUPSStorageAPI::Store("ip", gIPLastOctet);
 
     gNetworkChanged = true;
 }
 
-void resolutionCallback(
-    ConfigItemMultipleValues *,
-    uint32_t value
-)
+void SetResolution(uint32_t value)
 {
+    if (value > 4)
+        value = 4;
+
     gResolution = value;
 
     switch(value)
@@ -110,41 +111,59 @@ void resolutionCallback(
             break;
     }
 
-
-    WUPSStorageAPI::Store("resolution", value);
+    WUPSStorageAPI::Store("resolution", gResolution);
 
     gResolutionChanged = true;
+
+    DEBUG_FUNCTION_LINE("Resolution changed to %ux%u", gWidth, gHeight);
 }
 
-void fpsCallback(
-    ConfigItemMultipleValues *,
-    uint32_t value
-)
+void resolutionCallback(ConfigItemMultipleValues *, uint32_t value)
+{
+    SetResolution(value);
+}
+
+void DecreaseResolutionCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void *)
+{
+    if (gResolution > 0)
+    {
+        SetResolution(gResolution - 1);
+    }
+    else
+    {
+        DEBUG_FUNCTION_LINE("Already at minimum resolution: %ux%u", gWidth, gHeight);
+    }
+}
+
+void IncreaseResolutionCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void *)
+{
+    if (gResolution < 4)
+    {
+        SetResolution(gResolution + 1);
+    }
+    else
+    {
+        DEBUG_FUNCTION_LINE("Already at maximum resolution: %ux%u", gWidth, gHeight);
+    }
+}
+
+void fpsCallback(ConfigItemMultipleValues *, uint32_t value)
 {
     gFrameSkip = value;
 
     WUPSStorageAPI::Store("fps", value);
 }
 
-void compressionCallback(
-    ConfigItemMultipleValues *,
-    uint32_t value
-)
+void compressionCallback(ConfigItemMultipleValues *, uint32_t value)
 {
     gCompressionMode = static_cast<CompressionMode>(value);
 
-    WUPSStorageAPI::Store(
-        "compression",
-        value
-    );
+    WUPSStorageAPI::Store("compression", value);
 
     gCompressionChanged = true;
 }
 
-void jpegQualityCallback(
-    ConfigItemIntegerRange *,
-    int32_t value
-)
+void jpegQualityCallback(ConfigItemIntegerRange *, int32_t value)
 {
     if(value < 10)
         value = 10;
@@ -154,18 +173,12 @@ void jpegQualityCallback(
 
     gJPEGQuality = value;
 
-    WUPSStorageAPI::Store(
-        "jpeg_quality",
-        gJPEGQuality
-    );
+    WUPSStorageAPI::Store("jpeg_quality", gJPEGQuality);
 }
 
 
 
-void boolCallback(
-    ConfigItemBoolean *item,
-    bool value
-)
+void boolCallback( ConfigItemBoolean *item, bool value)
 {
     if(strcmp(item->identifier, "delta") == 0)
     {
@@ -176,18 +189,12 @@ void boolCallback(
         gEnabled = value;
     }
 
-    WUPSStorageAPI::Store(
-        item->identifier,
-        value
-    );
+    WUPSStorageAPI::Store(item->identifier, value);
 }
 
 
 
-void integerCallback(
-    ConfigItemIntegerRange *item,
-    int32_t value
-)
+void integerCallback(ConfigItemIntegerRange *item, int32_t value)
 {
     if(strcmp(item->identifier, "keyframe") == 0)
     {
@@ -200,17 +207,12 @@ void integerCallback(
     }
 
 
-    WUPSStorageAPI::Store(
-        item->identifier,
-        value
-    );
+    WUPSStorageAPI::Store(item->identifier, value);
 }
 
 
 
-WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(
-    WUPSConfigCategoryHandle rootHandle
-)
+WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle)
 {
     WUPSConfigCategory root(rootHandle);
 
@@ -431,6 +433,126 @@ void InitConfig()
         ConfigMenuOpenedCallback,
         ConfigMenuClosedCallback
     );
+
+
+    WUPSButtonCombo_Buttons decreaseCombo =
+        static_cast<WUPSButtonCombo_Buttons>(
+            WUPS_BUTTON_COMBO_BUTTON_TV |
+            WUPS_BUTTON_COMBO_BUTTON_ZL
+        );
+
+    WUPSButtonCombo_ComboStatus decreaseStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
+
+    WUPSButtonCombo_Error decreaseError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
+
+    auto decreaseResult =
+        WUPSButtonComboAPI::CreateComboPressDown(
+            "StreamMii: Decrease Resolution",
+            decreaseCombo,
+            DecreaseResolutionCallback,
+            nullptr,
+            decreaseStatus,
+            decreaseError
+        );
+
+    if (decreaseResult &&
+        decreaseError == WUPS_BUTTON_COMBO_ERROR_SUCCESS)
+    {
+        gDecreaseResolutionComboHandle =
+            decreaseResult->getHandle();
+
+        DEBUG_FUNCTION_LINE(
+            "Decrease combo: error=%d status=%d",
+            decreaseError,
+            decreaseStatus
+        );
+
+        if (decreaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_VALID)
+        {
+            DEBUG_FUNCTION_LINE(
+                "Decrease combo is VALID and ACTIVE"
+            );
+        }
+        else if (decreaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_CONFLICT)
+        {
+            DEBUG_FUNCTION_LINE(
+                "Decrease combo has a CONFLICT and is INACTIVE"
+            );
+        }
+
+        // Keep the ButtonCombo object alive.
+        sButtonComboInstances.emplace_front(
+            std::move(*decreaseResult)
+        );
+    }
+    else
+    {
+        DEBUG_FUNCTION_LINE(
+            "Failed to register decrease combo: error=%d status=%d",
+            decreaseError,
+            decreaseStatus
+        );
+    }
+
+
+    WUPSButtonCombo_Buttons increaseCombo =
+        static_cast<WUPSButtonCombo_Buttons>(
+            WUPS_BUTTON_COMBO_BUTTON_TV |
+            WUPS_BUTTON_COMBO_BUTTON_ZR
+        );
+
+    WUPSButtonCombo_ComboStatus increaseStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
+
+    WUPSButtonCombo_Error increaseError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
+
+    auto increaseResult =
+        WUPSButtonComboAPI::CreateComboPressDown(
+            "StreamMii: Increase Resolution",
+            increaseCombo,
+            IncreaseResolutionCallback,
+            nullptr,
+            increaseStatus,
+            increaseError
+        );
+
+    if (increaseResult &&
+        increaseError == WUPS_BUTTON_COMBO_ERROR_SUCCESS)
+    {
+        gIncreaseResolutionComboHandle =
+            increaseResult->getHandle();
+
+        DEBUG_FUNCTION_LINE(
+            "Increase combo: error=%d status=%d",
+            increaseError,
+            increaseStatus
+        );
+
+        if (increaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_VALID)
+        {
+            DEBUG_FUNCTION_LINE(
+                "Increase combo is VALID and ACTIVE"
+            );
+        }
+        else if (increaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_CONFLICT)
+        {
+            DEBUG_FUNCTION_LINE(
+                "Increase combo has a CONFLICT and is INACTIVE"
+            );
+        }
+
+        // Keep the ButtonCombo object alive.
+        sButtonComboInstances.emplace_front(
+            std::move(*increaseResult)
+        );
+    }
+    else
+    {
+        DEBUG_FUNCTION_LINE(
+            "Failed to register increase combo: error=%d status=%d",
+            increaseError,
+            increaseStatus
+        );
+    }
 }
 
 

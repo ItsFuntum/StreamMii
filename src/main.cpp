@@ -32,6 +32,11 @@ INITIALIZE_PLUGIN()
     deinitLogging();
 }
 
+DEINITIALIZE_PLUGIN()
+{
+    StreamMii::sButtonComboInstances.clear();
+}
+
 ON_APPLICATION_START()
 {
     initLogging();
