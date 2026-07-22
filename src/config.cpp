@@ -3,6 +3,7 @@
 
 #include <wups.h>
 #include <wups/button_combo/api.h>
+#include <wups/config/WUPSConfigItemButtonCombo.h>
 #include <wups/config/WUPSConfigCategory.h>
 #include <wups/config/WUPSConfigItemBoolean.h>
 #include <wups/config/WUPSConfigItemIntegerRange.h>
@@ -47,6 +48,14 @@ std::forward_list<WUPSButtonComboAPI::ButtonCombo> sButtonComboInstances;
 
 WUPSButtonCombo_ComboHandle gDecreaseResolutionComboHandle;
 WUPSButtonCombo_ComboHandle gIncreaseResolutionComboHandle;
+
+constexpr WUPSButtonCombo_Buttons DEFAULT_DECREASE_COMBO =
+    WUPS_BUTTON_COMBO_BUTTON_TV |
+    WUPS_BUTTON_COMBO_BUTTON_ZL;
+
+constexpr WUPSButtonCombo_Buttons DEFAULT_INCREASE_COMBO =
+    WUPS_BUTTON_COMBO_BUTTON_TV |
+    WUPS_BUTTON_COMBO_BUTTON_ZR;
 
 
 void ConfigMenuClosedCallback()
@@ -174,6 +183,17 @@ void jpegQualityCallback(ConfigItemIntegerRange *, int32_t value)
     gJPEGQuality = value;
 
     WUPSStorageAPI::Store("jpeg_quality", gJPEGQuality);
+}
+
+
+
+void buttonComboCallback(ConfigItemButtonCombo *item, uint32_t newValue)
+{
+    DEBUG_FUNCTION_LINE(
+        "Button combo changed: %s -> 0x%08X",
+        item->identifier,
+        newValue
+    );
 }
 
 
@@ -353,6 +373,28 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         )
     );
 
+    root.add(
+        WUPSConfigItemButtonCombo::Create(
+            "decrease_resolution_combo",
+            "Decrease Resolution Combo",
+            WUPS_BUTTON_COMBO_BUTTON_TV |
+            WUPS_BUTTON_COMBO_BUTTON_ZL,
+            gDecreaseResolutionComboHandle,
+            buttonComboCallback
+        )
+    );
+
+    root.add(
+        WUPSConfigItemButtonCombo::Create(
+            "increase_resolution_combo",
+            "Increase Resolution Combo",
+            WUPS_BUTTON_COMBO_BUTTON_TV |
+            WUPS_BUTTON_COMBO_BUTTON_ZR,
+            gIncreaseResolutionComboHandle,
+            buttonComboCallback
+        )
+    );
+
 
     return WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS;
 }
@@ -435,12 +477,6 @@ void InitConfig()
     );
 
 
-    WUPSButtonCombo_Buttons decreaseCombo =
-        static_cast<WUPSButtonCombo_Buttons>(
-            WUPS_BUTTON_COMBO_BUTTON_TV |
-            WUPS_BUTTON_COMBO_BUTTON_ZL
-        );
-
     WUPSButtonCombo_ComboStatus decreaseStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
 
     WUPSButtonCombo_Error decreaseError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
@@ -448,7 +484,7 @@ void InitConfig()
     auto decreaseResult =
         WUPSButtonComboAPI::CreateComboPressDown(
             "StreamMii: Decrease Resolution",
-            decreaseCombo,
+            DEFAULT_DECREASE_COMBO,
             DecreaseResolutionCallback,
             nullptr,
             decreaseStatus,
@@ -495,12 +531,6 @@ void InitConfig()
     }
 
 
-    WUPSButtonCombo_Buttons increaseCombo =
-        static_cast<WUPSButtonCombo_Buttons>(
-            WUPS_BUTTON_COMBO_BUTTON_TV |
-            WUPS_BUTTON_COMBO_BUTTON_ZR
-        );
-
     WUPSButtonCombo_ComboStatus increaseStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
 
     WUPSButtonCombo_Error increaseError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
@@ -508,7 +538,7 @@ void InitConfig()
     auto increaseResult =
         WUPSButtonComboAPI::CreateComboPressDown(
             "StreamMii: Increase Resolution",
-            increaseCombo,
+            DEFAULT_INCREASE_COMBO,
             IncreaseResolutionCallback,
             nullptr,
             increaseStatus,
