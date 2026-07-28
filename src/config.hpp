@@ -25,6 +25,14 @@ extern bool gResolutionChanged;
 extern bool gNetworkChanged;
 extern bool gCompressionChanged;
 
+enum class CaptureTarget : uint32_t
+{
+    TV = 0,
+    DRC = 1
+};
+
+extern CaptureTarget gCaptureTarget;
+
 enum class CompressionMode : uint32_t
 {
     LZ4 = 0,

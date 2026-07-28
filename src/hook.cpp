@@ -1,4 +1,5 @@
 #include "capture.hpp"
+#include "config.hpp"
 #include "utils/logger.h"
 
 #include <gx2/swap.h>
@@ -8,9 +9,17 @@
 DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer_hook, const GX2ColorBuffer *colorBuffer, GX2ScanTarget scanTarget)
 {
     real_GX2CopyColorBufferToScanBuffer_hook(colorBuffer, scanTarget);
-    if (scanTarget == GX2_SCAN_TARGET_TV && colorBuffer)
+
+    if (!colorBuffer)
+        return;
+
+    if (StreamMii::gCaptureTarget == StreamMii::CaptureTarget::TV && scanTarget == GX2_SCAN_TARGET_TV)
     {
-        StreamMii::CaptureFrame((GX2ColorBuffer *) colorBuffer);
+        StreamMii::CaptureFrame(const_cast<GX2ColorBuffer *>(colorBuffer));
+    }
+    else if (StreamMii::gCaptureTarget == StreamMii::CaptureTarget::DRC && scanTarget == GX2_SCAN_TARGET_DRC)
+    {
+        StreamMii::CaptureFrame(const_cast<GX2ColorBuffer *>(colorBuffer));
     }
 }
 

@@ -39,6 +39,8 @@ bool gResolutionChanged = false;
 bool gNetworkChanged = false;
 bool gCompressionChanged = false;
 
+CaptureTarget gCaptureTarget = CaptureTarget::TV;
+
 CompressionMode gCompressionMode = CompressionMode::LZ4;
 uint32_t compression = 0;
 
@@ -83,6 +85,20 @@ void ipCallback(ConfigItemIntegerRange *, int32_t value)
     WUPSStorageAPI::Store("ip", gIPLastOctet);
 
     gNetworkChanged = true;
+}
+
+void captureTargetCallback(ConfigItemMultipleValues *, uint32_t value)
+{
+    gCaptureTarget = static_cast<CaptureTarget>(value);
+
+    WUPSStorageAPI::Store("capture_target", value);
+
+    DEBUG_FUNCTION_LINE(
+        "Capture target changed to %s",
+        gCaptureTarget == CaptureTarget::TV
+            ? "TV"
+            : "DRC"
+    );
 }
 
 void SetResolution(uint32_t value)
@@ -274,6 +290,24 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
     );
 
 
+    constexpr WUPSConfigItemMultipleValues::ValuePair captureTargetOptions[] =
+    {
+        {0, "TV"},
+        {1, "DRC"}
+    };
+
+    root.add(
+        WUPSConfigItemMultipleValues::CreateFromValue(
+            "capture_target",
+            "Capture Target",
+            0,
+            static_cast<uint32_t>(gCaptureTarget),
+            captureTargetOptions,
+            captureTargetCallback
+        )
+    );
+
+
     constexpr WUPSConfigItemMultipleValues::ValuePair resolutions[] =
     {
         {0, "160x90"},
@@ -428,6 +462,16 @@ void InitConfig()
         gPort,
         (uint32_t)4242
     );
+
+    uint32_t captureTarget = 0;
+
+    WUPSStorageAPI::GetOrStoreDefault(
+        "capture_target",
+        captureTarget,
+        (uint32_t)0
+    );
+
+    gCaptureTarget = static_cast<CaptureTarget>(captureTarget);
 
     WUPSStorageAPI::GetOrStoreDefault(
         "resolution",
