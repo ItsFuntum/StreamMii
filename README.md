@@ -1,1 +1,128 @@
 # StreamMii
+
+StreamMii is a Wii U plugin that captures and streams the TV or DRC (GamePad) display to a receiver over the network.
+
+## Installation
+
+(`[ENVIRONMENT]` is a placeholder for the actual environment name.)
+
+1. Copy the file  `StreamMii.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+2. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
+
+## Usage
+
+After installation:
+
+1. Start the receiver with a command such as:
+
+   ```bash
+   python receiver.py
+   ```
+
+2. Start the Wii U using your environment (for example, Aroma) and open the config menu.
+
+3. Navigate to **StreamMii** and configure the following settings:
+
+   * **Capture Target**: Choose whether to capture the TV or DRC (GamePad).
+   * **Receiver's Local IP Address**: Set this to the last digits of the IP address of the device receiving the stream.
+
+   Currently, the plugin only supports receiver IP addresses in the `192.168.1.X` range.
+
+4. Start the application or game you want to stream.
+
+## Features
+
+* Capture target can be set to **TV** or **DRC (GamePad)**
+* Capture resolutions:
+
+  * 160x90
+  * 320x180
+  * 480x270
+  * 640x360
+  * 854x480
+* Maximum frame rates:
+
+  * 1 FPS
+  * 5 FPS
+  * 10 FPS
+  * 15 FPS
+  * 20 FPS
+  * 30 FPS
+  * 60 FPS
+* LZ4 and JPEG compression
+* Adjustable JPEG quality
+* Optional LZ4 delta encoding
+* Configurable button combos for changing the capture resolution
+
+## Button Combos
+
+The button combos used to change the capture resolution can be configured in the StreamMii config menu.
+
+The default button combos are:
+
+* **TV + ZL**: Decrease capture resolution
+* **TV + ZR**: Increase capture resolution
+
+## Known Issues
+
+* Performance and stream quality isn't great. There are no plans to improve this due to the lack of hardware encoding.
+
+* StreamMii does not stream certain applications and applets, such as Miiverse. Opening the HOME Menu or WUPS Config Menu also pauses the stream. Additionally, some games require workarounds for streaming. For example, **Super Smash Bros. for Wii U** requires the TV to be set to 720p mode for the plugin to stream correctly.
+
+* Some applications may produce different colors in the stream compared to what is displayed on the Wii U.
+
+## Building
+
+For building you need:
+
+* [wups](https://github.com/Maschell/WiiUPluginSystem)
+* [wut](https://github.com/devkitpro/wut)
+
+Install these dependencies according to their respective README files. Make sure to also install any dependencies required by the libraries themselves.
+
+Once the dependencies are installed, StreamMii can be compiled with:
+
+```bash
+make
+```
+
+For a debug build with logging enabled:
+
+```bash
+make DEBUG=1
+```
+
+## Building Using Docker
+
+It's possible to use a docker image for building. This way you don't need anything installed on your host system.
+
+Build the Docker image (only required once):
+
+```bash
+docker build . -t streammii-builder
+```
+
+Build StreamMii with logging enabled:
+
+```bash
+docker run -it --rm -v ${PWD}:/project streammii-builder make DEBUG=1
+```
+
+Clean the build files:
+
+```bash
+docker run -it --rm -v ${PWD}:/project streammii-builder make clean
+```
+
+## Formatting the Code Using Docker
+
+The following command formats all `.cpp`, `.hpp`, and `.h` files in `src`, while excluding files under `src/libs/`:
+
+```bash
+find src -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) ! -path 'src/libs/*' -print0 |
+xargs -0 docker run --rm \
+    -v "$PWD:/src" \
+    -w /src \
+    ghcr.io/wiiu-env/clang-format:13.0.0-2 \
+    -i
+```
