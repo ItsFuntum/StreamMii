@@ -2,8 +2,7 @@
 
 #include <stdint.h>
 
-struct FrameMessage
-{
+struct FrameMessage {
     void *buffer;
 
     uint32_t size;

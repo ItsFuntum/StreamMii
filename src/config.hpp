@@ -1,52 +1,49 @@
 #pragma once
 
-#include <wups/button_combo/api.h>
 #include <forward_list>
 #include <stdint.h>
+#include <wups/button_combo/api.h>
 
-namespace StreamMii
-{
+namespace StreamMii {
 
-extern bool gEnabled;
+    extern bool gEnabled;
 
-extern uint32_t gWidth;
-extern uint32_t gHeight;
+    extern uint32_t gWidth;
+    extern uint32_t gHeight;
 
-extern uint32_t gFrameSkip;
+    extern uint32_t gFrameSkip;
 
-extern bool gDeltaEnabled;
+    extern bool gDeltaEnabled;
 
-extern uint32_t gKeyframeInterval;
+    extern uint32_t gKeyframeInterval;
 
-extern char gIP[16];
-extern uint32_t gPort;
+    extern char gIP[16];
+    extern uint32_t gPort;
 
-extern bool gResolutionChanged;
-extern bool gNetworkChanged;
-extern bool gCompressionChanged;
+    extern bool gResolutionChanged;
+    extern bool gNetworkChanged;
+    extern bool gCompressionChanged;
 
-enum class CaptureTarget : uint32_t
-{
-    TV = 0,
-    DRC = 1
-};
+    enum class CaptureTarget : uint32_t {
+        TV  = 0,
+        DRC = 1
+    };
 
-extern CaptureTarget gCaptureTarget;
+    extern CaptureTarget gCaptureTarget;
 
-enum class CompressionMode : uint32_t
-{
-    LZ4 = 0,
-    JPEG = 1
-};
+    enum class CompressionMode : uint32_t {
+        LZ4  = 0,
+        JPEG = 1
+    };
 
-extern CompressionMode gCompressionMode;
+    extern CompressionMode gCompressionMode;
 
-extern uint32_t gJPEGQuality;
+    extern uint32_t gJPEGQuality;
 
 
-extern std::forward_list<WUPSButtonComboAPI::ButtonCombo> sButtonComboInstances;
+    extern std::forward_list<WUPSButtonComboAPI::ButtonCombo> sButtonComboInstances;
 
 
-void InitConfig();
+    void InitConfig();
 
-}
+} // namespace StreamMii

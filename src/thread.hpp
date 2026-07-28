@@ -2,12 +2,11 @@
 
 #include <net.hpp>
 
-namespace StreamMii
-{
+namespace StreamMii {
 
-extern Net::Compression gCompression;
+    extern Net::Compression gCompression;
 
-bool InitThread();
-void ShutdownThread();
+    bool InitThread();
+    void ShutdownThread();
 
-}
+} // namespace StreamMii

@@ -1,9 +1,9 @@
-#include <gx2/display.h>
-#include "utils/logger.h"
 #include "capture.hpp"
+#include "config.hpp"
 #include "net.hpp"
 #include "thread.hpp"
-#include "config.hpp"
+#include "utils/logger.h"
+#include <gx2/display.h>
 
 #include <wups.h>
 
@@ -21,8 +21,7 @@ WUPS_USE_STORAGE("streammii");
 static bool initialized = false;
 
 
-INITIALIZE_PLUGIN()
-{
+INITIALIZE_PLUGIN() {
     initLogging();
 
     StreamMii::InitConfig();
@@ -32,19 +31,16 @@ INITIALIZE_PLUGIN()
     deinitLogging();
 }
 
-DEINITIALIZE_PLUGIN()
-{
+DEINITIALIZE_PLUGIN() {
     StreamMii::sButtonComboInstances.clear();
 }
 
-ON_APPLICATION_START()
-{
+ON_APPLICATION_START() {
     initLogging();
 
     DEBUG_FUNCTION_LINE("Application starting");
 
-    if(initialized)
-    {
+    if (initialized) {
         DEBUG_FUNCTION_LINE("Restarting StreamMii for new application");
 
         StreamMii::ShutdownThread();
@@ -65,15 +61,14 @@ ON_APPLICATION_ENDS() {
     deinitLogging();
 }
 
-ON_APPLICATION_REQUESTS_EXIT()
-{
-    if(!initialized)
+ON_APPLICATION_REQUESTS_EXIT() {
+    if (!initialized)
         return;
 
     DEBUG_FUNCTION_LINE("Application exiting");
 
     StreamMii::ShutdownThread();
-    
+
     StreamMii::ShutdownCapture();
 
     StreamMii::Net::Shutdown();

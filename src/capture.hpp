@@ -6,37 +6,37 @@
 
 namespace StreamMii {
 
-struct StoredBuffer {
-    void *buffer = nullptr;
-    uint32_t buffer_size = 0;
-    int32_t mode = 0;
-    GX2SurfaceFormat surface_format;
-    GX2BufferingMode buffering_mode;
-};
+    struct StoredBuffer {
+        void *buffer         = nullptr;
+        uint32_t buffer_size = 0;
+        int32_t mode         = 0;
+        GX2SurfaceFormat surface_format;
+        GX2BufferingMode buffering_mode;
+    };
 
-void ReleaseBuffer(void *buffer);
+    void ReleaseBuffer(void *buffer);
 
-bool GetLatestFrame(FrameMessage &out);
+    bool GetLatestFrame(FrameMessage &out);
 
-void SetTVBuffer(
-    void *buffer,
-    uint32_t buffer_size,
-    int32_t mode,
-    GX2SurfaceFormat format,
-    GX2BufferingMode buffering);
+    void SetTVBuffer(
+            void *buffer,
+            uint32_t buffer_size,
+            int32_t mode,
+            GX2SurfaceFormat format,
+            GX2BufferingMode buffering);
 
-void SetDRCBuffer(
-    void *buffer,
-    uint32_t buffer_size,
-    int32_t mode,
-    GX2SurfaceFormat format,
-    GX2BufferingMode buffering);
+    void SetDRCBuffer(
+            void *buffer,
+            uint32_t buffer_size,
+            int32_t mode,
+            GX2SurfaceFormat format,
+            GX2BufferingMode buffering);
 
-const StoredBuffer &GetTVBuffer();
-const StoredBuffer &GetDRCBuffer();
+    const StoredBuffer &GetTVBuffer();
+    const StoredBuffer &GetDRCBuffer();
 
-void InitCapture();
-void ShutdownCapture();
-void CaptureFrame(const GX2ColorBuffer *colorBuffer);
+    void InitCapture();
+    void ShutdownCapture();
+    void CaptureFrame(const GX2ColorBuffer *colorBuffer);
 
-}
+} // namespace StreamMii
