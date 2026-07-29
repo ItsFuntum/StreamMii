@@ -240,7 +240,6 @@ namespace StreamMii {
     WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
         WUPSConfigCategory root(rootHandle);
 
-
         root.add(
                 WUPSConfigItemBoolean::Create(
                         "enabled",
@@ -250,7 +249,10 @@ namespace StreamMii {
                         boolCallback));
 
 
-        root.add(
+        // Network Settings
+        auto networkCategory = WUPSConfigCategory::Create("Network Settings");
+
+        networkCategory.add(
                 WUPSConfigItemIntegerRange::Create(
                         "ip_second_last_octet",
                         "Receiver IP - Third Octet (192.168.X.X)",
@@ -260,8 +262,7 @@ namespace StreamMii {
                         254,
                         ipSecondLastOctetCallback));
 
-
-        root.add(
+        networkCategory.add(
                 WUPSConfigItemIntegerRange::Create(
                         "ip",
                         "Receiver IP - Last Octet (192.168.X.X)",
@@ -271,8 +272,7 @@ namespace StreamMii {
                         254,
                         ipCallback));
 
-
-        root.add(
+        networkCategory.add(
                 WUPSConfigItemIntegerRange::Create(
                         "port",
                         "Port",
@@ -282,13 +282,18 @@ namespace StreamMii {
                         9999,
                         integerCallback));
 
+        root.add(std::move(networkCategory));
+
+
+        // Video Settings
+        auto videoCategory = WUPSConfigCategory::Create("Video Settings");
 
         constexpr WUPSConfigItemMultipleValues::ValuePair captureTargetOptions[] =
                 {
                         {0, "TV"},
                         {1, "DRC"}};
 
-        root.add(
+        videoCategory.add(
                 WUPSConfigItemMultipleValues::CreateFromValue(
                         "capture_target",
                         "Capture Target",
@@ -296,7 +301,6 @@ namespace StreamMii {
                         static_cast<uint32_t>(gCaptureTarget),
                         captureTargetOptions,
                         captureTargetCallback));
-
 
         constexpr WUPSConfigItemMultipleValues::ValuePair resolutions[] =
                 {
@@ -306,8 +310,7 @@ namespace StreamMii {
                         {3, "640x360"},
                         {4, "854x480"}};
 
-
-        root.add(
+        videoCategory.add(
                 WUPSConfigItemMultipleValues::CreateFromValue(
                         "resolution",
                         "Resolution",
@@ -315,7 +318,6 @@ namespace StreamMii {
                         gResolution,
                         resolutions,
                         resolutionCallback));
-
 
         constexpr WUPSConfigItemMultipleValues::ValuePair fpsOptions[] =
                 {
@@ -327,7 +329,7 @@ namespace StreamMii {
                         {12, "5 FPS"},
                         {60, "1 FPS"}};
 
-        root.add(
+        videoCategory.add(
                 WUPSConfigItemMultipleValues::CreateFromValue(
                         "fps",
                         "Max Frame Rate",
@@ -336,14 +338,13 @@ namespace StreamMii {
                         fpsOptions,
                         fpsCallback));
 
-
         constexpr WUPSConfigItemMultipleValues::ValuePair compressionOptions[] =
                 {
                         {0, "LZ4"},
                         {1, "JPEG"},
                 };
 
-        root.add(
+        videoCategory.add(
                 WUPSConfigItemMultipleValues::CreateFromValue(
                         "compression",
                         "Compression",
@@ -352,8 +353,7 @@ namespace StreamMii {
                         compressionOptions,
                         compressionCallback));
 
-
-        root.add(
+        videoCategory.add(
                 WUPSConfigItemIntegerRange::Create(
                         "jpeg_quality",
                         "JPEG Quality",
@@ -363,8 +363,7 @@ namespace StreamMii {
                         100,
                         jpegQualityCallback));
 
-
-        root.add(
+        videoCategory.add(
                 WUPSConfigItemBoolean::Create(
                         "delta",
                         "LZ4 Delta encoding",
@@ -372,8 +371,7 @@ namespace StreamMii {
                         gDeltaEnabled,
                         boolCallback));
 
-
-        root.add(
+        videoCategory.add(
                 WUPSConfigItemIntegerRange::Create(
                         "keyframe",
                         "Keyframe interval",
@@ -383,7 +381,13 @@ namespace StreamMii {
                         300,
                         integerCallback));
 
-        root.add(
+        root.add(std::move(videoCategory));
+
+
+        // Button Combos
+        auto buttonComboCategory = WUPSConfigCategory::Create("Button Combos");
+
+        buttonComboCategory.add(
                 WUPSConfigItemButtonCombo::Create(
                         "decrease_resolution_combo",
                         "Decrease Resolution Combo",
@@ -392,7 +396,7 @@ namespace StreamMii {
                         gDecreaseResolutionComboHandle,
                         buttonComboCallback));
 
-        root.add(
+        buttonComboCategory.add(
                 WUPSConfigItemButtonCombo::Create(
                         "increase_resolution_combo",
                         "Increase Resolution Combo",
@@ -400,6 +404,8 @@ namespace StreamMii {
                                 WUPS_BUTTON_COMBO_BUTTON_ZR,
                         gIncreaseResolutionComboHandle,
                         buttonComboCallback));
+
+        root.add(std::move(buttonComboCategory));
 
 
         return WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS;
