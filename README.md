@@ -21,12 +21,14 @@ After installation:
 
 2. Start the Wii U using your environment (for example, Aroma) and open the config menu.
 
-3. Navigate to **StreamMii** and configure the following settings:
+3. Navigate to **Network Settings** inside of **StreamMii** and configure the following settings:
 
-   * **Capture Target**: Choose whether to capture the TV or DRC (GamePad).
-   * **Receiver's Local IP Address**: Set this to the last digits of the IP address of the device receiving the stream.
+   * **Receiver IP - Third Octet**: Set this to the second to last digits of the IP address of the device receiving the stream.
+   * **Receiver IP - Last Octet**: Set this to the last digits of the IP address of the device receiving the stream.
+  
+   For example, if the device's Local IP Address is **192.168.1.98** then you would set the Third Octet to **1** and the Last Octet to **98**
 
-   Currently, the plugin only supports receiver IP addresses in the `192.168.1.X` range.
+   Currently, the plugin only supports receiver IP addresses in the `192.168.X.X` range.
 
 4. Start the application or game you want to stream.
 
