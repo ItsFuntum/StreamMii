@@ -29,8 +29,9 @@ namespace StreamMii {
 
     uint32_t gKeyframeInterval = 60;
 
-    uint32_t gIPLastOctet = 100;
-    char gIP[16]          = "192.168.1.100";
+    uint32_t gIPSecondLastOctet = 1;
+    uint32_t gIPLastOctet       = 100;
+    char gIP[16]                = "192.168.1.100";
 
     uint32_t gPort = 4242;
 
@@ -63,6 +64,27 @@ namespace StreamMii {
         WUPSStorageAPI::SaveStorage();
     }
 
+    void ipSecondLastOctetCallback(ConfigItemIntegerRange *, int32_t value) {
+        if (value < 0)
+            value = 0;
+
+        if (value > 254)
+            value = 254;
+
+        gIPSecondLastOctet = value;
+
+        snprintf(
+                gIP,
+                sizeof(gIP),
+                "192.168.%d.%d",
+                gIPSecondLastOctet,
+                gIPLastOctet);
+
+        WUPSStorageAPI::Store("ip_second_last_octet", gIPSecondLastOctet);
+
+        gNetworkChanged = true;
+    }
+
     void ipCallback(ConfigItemIntegerRange *, int32_t value) {
         if (value < 1)
             value = 1;
@@ -75,7 +97,8 @@ namespace StreamMii {
         snprintf(
                 gIP,
                 sizeof(gIP),
-                "192.168.1.%d",
+                "192.168.%d.%d",
+                gIPSecondLastOctet,
                 gIPLastOctet);
 
         WUPSStorageAPI::Store("ip", gIPLastOctet);
@@ -229,8 +252,19 @@ namespace StreamMii {
 
         root.add(
                 WUPSConfigItemIntegerRange::Create(
+                        "ip_second_last_octet",
+                        "Receiver IP - Third Octet (192.168.X.X)",
+                        1,
+                        gIPSecondLastOctet,
+                        0,
+                        254,
+                        ipSecondLastOctetCallback));
+
+
+        root.add(
+                WUPSConfigItemIntegerRange::Create(
                         "ip",
-                        "Receiver's Local IP Address (192.168.1.X)",
+                        "Receiver IP - Last Octet (192.168.X.X)",
                         100,
                         gIPLastOctet,
                         1,
@@ -385,9 +419,16 @@ namespace StreamMii {
 
 
         WUPSStorageAPI::GetOrStoreDefault(
+                "ip_second_last_octet",
+                gIPSecondLastOctet,
+                (uint32_t) 1);
+
+        WUPSStorageAPI::GetOrStoreDefault(
                 "ip",
                 gIPLastOctet,
                 (uint32_t) 100);
+
+        ipSecondLastOctetCallback(nullptr, gIPSecondLastOctet);
         ipCallback(nullptr, gIPLastOctet);
 
         WUPSStorageAPI::GetOrStoreDefault(
