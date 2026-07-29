@@ -121,6 +121,7 @@ The following command formats all `.cpp`, `.hpp`, and `.h` files in `src`, while
 ```bash
 find src -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) ! -path 'src/libs/*' -print0 |
 xargs -0 docker run --rm \
+    --user "$(id -u):$(id -g)" \
     -v "$PWD:/src" \
     -w /src \
     ghcr.io/wiiu-env/clang-format:13.0.0-2 \
