@@ -2,6 +2,9 @@
 
 StreamMii is a Wii U plugin that captures and streams the TV or DRC (GamePad) display to a receiver over the network.
 
+> [!CAUTION]
+> The plugin can use a significant amount of system memory at higher capture resolutions. This is amplified when using JPEG compression, as the output is RGB888 instead of RGB565. You can reduce the capture resolution at any time using the **Decrease Capture Resolution** button combo (default: **TV + ZL**).
+
 ## Installation
 
 (`[ENVIRONMENT]` is a placeholder for the actual environment name.)
@@ -23,14 +26,16 @@ After installation:
 
 3. Navigate to **Network Settings** inside of **StreamMii** and configure the following settings:
 
-   * **Receiver IP - Third Octet**: Set this to the second to last digits of the IP address of the device receiving the stream.
-   * **Receiver IP - Last Octet**: Set this to the last digits of the IP address of the device receiving the stream.
+   * **Receiver IP - Third Octet**: Set this to the third octet of the IP address of the device receiving the stream.
+   * **Receiver IP - Last Octet**: Set this to the last octet of the IP address of the device receiving the stream.
   
-   For example, if the device's Local IP Address is **192.168.1.98** then you would set the Third Octet to **1** and the Last Octet to **98**
+   For example, if the device's local IP address is **192.168.1.98**, set:
+   * Third Octet to `1`
+   * Last Octet to `98`
 
-   Currently, the plugin only supports receiver IP addresses in the `192.168.X.X` range.
+   Currently, the receiver IP address needs to be in the `192.168.X.X` range.
 
-4. Start the application or game you want to stream.
+5. Start the application or game you want to stream.
 
 ## Features
 
@@ -51,7 +56,7 @@ After installation:
   * 20 FPS
   * 30 FPS
   * 60 FPS
-* LZ4 and JPEG compression
+* LZ4 and JPEG compression (LZ4 outputs RGB565 and JPEG outputs RGB888)
 * Adjustable JPEG quality
 * Optional LZ4 delta encoding
 * Configurable button combos for changing the capture resolution
