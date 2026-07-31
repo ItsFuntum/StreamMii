@@ -24,16 +24,13 @@ After installation:
 
 2. Start the Wii U using your environment (for example, Aroma) and open the config menu.
 
-3. Navigate to **Network Settings** inside of **StreamMii** and configure the following settings:
-
-   * **Receiver IP - Third Octet**: Set this to the third octet of the IP address of the device receiving the stream.
-   * **Receiver IP - Last Octet**: Set this to the last octet of the IP address of the device receiving the stream.
+3. Navigate to **Network Settings** inside of **StreamMii** and set the octets to your device's local IP Address:
   
    For example, if the device's local IP address is **192.168.1.98**, set:
+   * First Octet to `192`
+   * Second Octet to `168`
    * Third Octet to `1`
-   * Last Octet to `98`
-
-   Currently, the receiver IP address needs to be in the `192.168.X.X` range.
+   * Fourth Octet to `98`
 
 5. Start the application or game you want to stream.
 
