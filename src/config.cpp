@@ -29,8 +29,11 @@ namespace StreamMii {
 
     uint32_t gKeyframeInterval = 60;
 
-    uint32_t gIPSecondLastOctet = 1;
-    uint32_t gIPLastOctet       = 100;
+    uint32_t gIPFirstOctet       = 192;
+    uint32_t gIPSecondOctet      = 168;
+    uint32_t gIPThirdOctet       = 1;
+    uint32_t gIPFourthOctet      = 100;
+
     char gIP[16]                = "192.168.1.100";
 
     uint32_t gPort = 4242;
@@ -60,51 +63,76 @@ namespace StreamMii {
             WUPS_BUTTON_COMBO_BUTTON_ZR;
 
 
-    void ConfigMenuClosedCallback() {
-        WUPSStorageAPI::SaveStorage();
-    }
 
-    void ipSecondLastOctetCallback(ConfigItemIntegerRange *, int32_t value) {
-        if (value < 0)
-            value = 0;
-
-        if (value > 254)
-            value = 254;
-
-        gIPSecondLastOctet = value;
-
-        snprintf(
+        void UpdateIPAddress() {
+            snprintf(
                 gIP,
                 sizeof(gIP),
-                "192.168.%d.%d",
-                gIPSecondLastOctet,
-                gIPLastOctet);
+                "%u.%u.%u.%u",
+                gIPFirstOctet,
+                gIPSecondOctet,
+                gIPThirdOctet,
+                gIPFourthOctet
+            );
 
-        WUPSStorageAPI::Store("ip_second_last_octet", gIPSecondLastOctet);
+            gNetworkChanged = true;
+        }
 
-        gNetworkChanged = true;
-    }
+        void ipFirstOctetCallback(ConfigItemIntegerRange *, int32_t value) {
+            if (value < 0)
+                value = 0;
 
-    void ipCallback(ConfigItemIntegerRange *, int32_t value) {
-        if (value < 1)
-            value = 1;
+            if (value > 255)
+                value = 255;
 
-        if (value > 254)
-            value = 254;
+            gIPFirstOctet = value;
 
-        gIPLastOctet = value;
+            WUPSStorageAPI::Store("ip_first_octet", gIPFirstOctet);
 
-        snprintf(
-                gIP,
-                sizeof(gIP),
-                "192.168.%d.%d",
-                gIPSecondLastOctet,
-                gIPLastOctet);
+            UpdateIPAddress();
+        }
 
-        WUPSStorageAPI::Store("ip", gIPLastOctet);
+        void ipSecondOctetCallback(ConfigItemIntegerRange *, int32_t value) {
+            if (value < 0)
+                value = 0;
 
-        gNetworkChanged = true;
-    }
+            if (value > 255)
+                value = 255;
+
+            gIPSecondOctet = value;
+
+            WUPSStorageAPI::Store("ip_second_octet", gIPSecondOctet);
+
+            UpdateIPAddress();
+        }
+
+        void ipThirdOctetCallback(ConfigItemIntegerRange *, int32_t value) {
+            if (value < 0)
+                value = 0;
+
+            if (value > 255)
+                value = 255;
+
+            gIPThirdOctet = value;
+
+            WUPSStorageAPI::Store("ip_third_octet", gIPThirdOctet);
+
+            UpdateIPAddress();
+        }
+
+        void ipFourthOctetCallback(ConfigItemIntegerRange *, int32_t value) {
+            if (value < 0)
+                value = 0;
+
+            if (value > 255)
+                value = 255;
+
+            gIPFourthOctet = value;
+
+            WUPSStorageAPI::Store("ip_fourth_octet", gIPFourthOctet);
+
+            UpdateIPAddress();
+        }
 
     void captureTargetCallback(ConfigItemMultipleValues *, uint32_t value) {
         gCaptureTarget = static_cast<CaptureTarget>(value);
@@ -237,6 +265,10 @@ namespace StreamMii {
     }
 
 
+    void ConfigMenuClosedCallback() {
+        WUPSStorageAPI::SaveStorage();
+    }
+
     WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
         WUPSConfigCategory root(rootHandle);
 
@@ -253,24 +285,44 @@ namespace StreamMii {
         auto networkCategory = WUPSConfigCategory::Create("Network Settings");
 
         networkCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "ip_second_last_octet",
-                        "Receiver IP - Third Octet (192.168.X.X)",
-                        1,
-                        gIPSecondLastOctet,
-                        0,
-                        254,
-                        ipSecondLastOctetCallback));
+            WUPSConfigItemIntegerRange::Create(
+                "ip_first_octet",
+                "Receiver IP - 1st Octet (e.g., 192)",
+                192,
+                gIPFirstOctet,
+                0,
+                255,
+                ipFirstOctetCallback));
 
         networkCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "ip",
-                        "Receiver IP - Last Octet (192.168.X.X)",
-                        100,
-                        gIPLastOctet,
-                        1,
-                        254,
-                        ipCallback));
+            WUPSConfigItemIntegerRange::Create(
+                "ip_second_octet",
+                "Receiver IP - 2nd Octet (e.g., 168)",
+                168,
+                gIPSecondOctet,
+                0,
+                255,
+                ipSecondOctetCallback));
+
+        networkCategory.add(
+            WUPSConfigItemIntegerRange::Create(
+                "ip_third_octet",
+                "Receiver IP - 3rd Octet (e.g., 1)",
+                1,
+                gIPThirdOctet,
+                0,
+                255,
+                ipThirdOctetCallback));
+
+        networkCategory.add(
+            WUPSConfigItemIntegerRange::Create(
+                "ip_fourth_octet",
+                "Receiver IP - 4th Octet (e.g., 100)",
+                100,
+                gIPFourthOctet,
+                0,
+                255,
+                ipFourthOctetCallback));
 
         networkCategory.add(
                 WUPSConfigItemIntegerRange::Create(
@@ -425,17 +477,26 @@ namespace StreamMii {
 
 
         WUPSStorageAPI::GetOrStoreDefault(
-                "ip_second_last_octet",
-                gIPSecondLastOctet,
-                (uint32_t) 1);
+            "ip_first_octet",
+            gIPFirstOctet,
+            (uint32_t)192);
 
         WUPSStorageAPI::GetOrStoreDefault(
-                "ip",
-                gIPLastOctet,
-                (uint32_t) 100);
+            "ip_second_octet",
+            gIPSecondOctet,
+            (uint32_t)168);
 
-        ipSecondLastOctetCallback(nullptr, gIPSecondLastOctet);
-        ipCallback(nullptr, gIPLastOctet);
+        WUPSStorageAPI::GetOrStoreDefault(
+            "ip_third_octet",
+            gIPThirdOctet,
+            (uint32_t)1);
+
+        WUPSStorageAPI::GetOrStoreDefault(
+            "ip_fourth_octet",
+            gIPFourthOctet,
+            (uint32_t)100);
+
+        UpdateIPAddress();
 
         WUPSStorageAPI::GetOrStoreDefault(
                 "port",
