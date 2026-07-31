@@ -373,13 +373,13 @@ namespace StreamMii {
 
         constexpr WUPSConfigItemMultipleValues::ValuePair fpsOptions[] =
                 {
-                        {1, "60 FPS"},
-                        {2, "30 FPS"},
-                        {3, "20 FPS"},
-                        {4, "15 FPS"},
-                        {6, "10 FPS"},
+                        {60, "1 FPS"},
                         {12, "5 FPS"},
-                        {60, "1 FPS"}};
+                        {6, "10 FPS"},
+                        {4, "15 FPS"},
+                        {3, "20 FPS"},
+                        {2, "30 FPS"},
+                        {1, "60 FPS"}};
 
         videoCategory.add(
                 WUPSConfigItemMultipleValues::CreateFromValue(
