@@ -14,17 +14,28 @@ StreamMii is a Wii U plugin that captures and streams the TV or DRC (GamePad) di
 
 ## Usage
 
+> [!NOTE]
+> To run the receiver, you will need the following Python packages:
+> * NumPy
+> * OpenCV
+> * lz4
+
 After installation:
 
-1. Start the receiver with a command such as:
+1. Start the receiver using the appropriate command for your operating system.
 
+   **Windows:**
    ```bash
-   python receiver.py
+   py receiver.py
+   ```
+   **Linux:**
+   ```bash
+   python3 receiver.py
    ```
 
-2. Start the Wii U using your environment (for example, Aroma) and open the config menu.
+1. Start the Wii U using your environment (for example, Aroma) and open the config menu.
 
-3. Navigate to **Network Settings** inside of **StreamMii** and set the octets to your device's local IP Address:
+2. Navigate to **Network Settings** inside of **StreamMii** and set the octets to your device's local IP Address:
   
    For example, if the device's local IP address is **192.168.1.98**, set:
    * First Octet to `192`
