@@ -18,6 +18,8 @@ namespace StreamMii {
 
     bool GetLatestFrame(FrameMessage &out);
 
+    void ReleaseFrame(const FrameMessage &frame);
+
     void SetTVBuffer(
             void *buffer,
             uint32_t buffer_size,
@@ -37,6 +39,6 @@ namespace StreamMii {
 
     void InitCapture();
     void ShutdownCapture();
-    void CaptureFrame(const GX2ColorBuffer *colorBuffer);
+    void CaptureFrame(const GX2ColorBuffer *colorBuffer, GX2SurfaceFormat scanFormat);
 
 } // namespace StreamMii

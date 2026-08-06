@@ -19,103 +19,155 @@
 
 namespace StreamMii {
 
-    GX2Surface resolvedSurface           = {};
-    static GX2Surface sTVSurface         = {};
-    static GX2ColorBuffer sCaptureBuffer = {};
+    GX2Surface resolvedSurface   = {};
+    static GX2Surface sTVSurface = {};
 
     static StoredBuffer sTVBuffer;
     static StoredBuffer sDRCBuffer;
 
-    static constexpr uint32_t BUFFER_COUNT = 2;
+    static constexpr uint32_t CAPTURE_POOL_SIZE = 3;
 
-    static uint8_t *sFrameCopies[BUFFER_COUNT] = {};
-    static bool sFrameUsed[BUFFER_COUNT]       = {};
+    struct CaptureSurface {
+        GX2ColorBuffer buffer;
+        GX2Surface aaResolve;
+
+        bool busy;
+        OSTime gpuTimestamp;
+
+        uint32_t width;
+        uint32_t height;
+        uint32_t pitch;
+
+        bool needsSRGB;
+    };
+
+    static CaptureSurface sCapturePool[CAPTURE_POOL_SIZE] = {};
+    static uint32_t sCaptureWriteIndex                    = 0;
 
     static FrameMessage latestFrame = {};
     static bool latestReady         = false;
     static OSMutex frameMutex;
 
+    static uint32_t sDroppedFrames = 0;
+
     static uint8_t frameSkip = 0;
 
-    static bool initialized = false;
+    static bool initialized     = false;
+    static bool poolInitialized = false;
 
-    static uint32_t sBytesPerPixel = 4;
 
-
-    static uint8_t *GetFreeBuffer() {
-        for (uint32_t i = 0; i < BUFFER_COUNT; i++) {
-            if (!sFrameUsed[i]) {
-                sFrameUsed[i] = true;
-                return sFrameCopies[i];
-            }
-        }
-
-        return nullptr;
+    static uint32_t GetCaptureBytesPerPixel() {
+        return gCompressionMode == CompressionMode::JPEG ? 4 : 2;
     }
 
-    void ReleaseBuffer(void *buffer) {
-        for (uint32_t i = 0; i < BUFFER_COUNT; i++) {
-            if (sFrameCopies[i] == buffer) {
-                sFrameUsed[i] = false;
-                return;
+    static CaptureSurface *GetFreeCaptureSurface() {
+        OSLockMutex(&frameMutex);
+        CaptureSurface *found = nullptr;
+        for (uint32_t i = 0; i < CAPTURE_POOL_SIZE; i++) {
+            uint32_t index = (sCaptureWriteIndex + i) % CAPTURE_POOL_SIZE;
+            if (!sCapturePool[index].busy) {
+                sCaptureWriteIndex = (index + 1) % CAPTURE_POOL_SIZE;
+                found              = &sCapturePool[index];
+                break;
             }
         }
+        OSUnlockMutex(&frameMutex);
+        return found;
     }
 
-    static bool CreateCaptureBuffer(GX2ColorBuffer &buffer) {
-        buffer.surface = {};
+    static bool CreateCaptureSurface(CaptureSurface &surface) {
+        memset(&surface, 0, sizeof(surface));
 
-        buffer.surface.width  = gWidth;
-        buffer.surface.height = gHeight;
-        buffer.surface.depth  = 1;
+        GX2Surface &captureSurface =
+                surface.buffer.surface;
 
-        buffer.surface.dim       = GX2_SURFACE_DIM_TEXTURE_2D;
-        buffer.surface.mipLevels = 1;
+        memset(
+                &captureSurface,
+                0,
+                sizeof(GX2Surface));
+
+        captureSurface.width  = gWidth;
+        captureSurface.height = gHeight;
+        captureSurface.depth  = 1;
+
+        captureSurface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
+
+        captureSurface.mipLevels = 1;
 
         switch (gCompressionMode) {
             case CompressionMode::JPEG:
-                buffer.surface.format = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
+                captureSurface.format = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
                 break;
 
             default:
-                buffer.surface.format = GX2_SURFACE_FORMAT_UNORM_R5_G6_B5;
+                captureSurface.format = GX2_SURFACE_FORMAT_UNORM_R5_G6_B5;
                 break;
         }
 
-        buffer.surface.aa = GX2_AA_MODE1X;
+        captureSurface.aa =
+                GX2_AA_MODE1X;
 
-        buffer.surface.use = (GX2SurfaceUse) (GX2_SURFACE_USE_COLOR_BUFFER | GX2_SURFACE_USE_TEXTURE);
+        captureSurface.use = (GX2SurfaceUse) (GX2_SURFACE_USE_COLOR_BUFFER | GX2_SURFACE_USE_TEXTURE);
 
-        buffer.surface.tileMode = GX2_TILE_MODE_LINEAR_ALIGNED;
+        captureSurface.tileMode = GX2_TILE_MODE_LINEAR_ALIGNED;
+        captureSurface.swizzle  = 0;
+        captureSurface.pitch    = 0;
 
-        buffer.surface.swizzle = 0;
-        buffer.surface.pitch   = 0;
-
-
-        GX2CalcSurfaceSizeAndAlignment(&buffer.surface);
-
-        DEBUG_FUNCTION_LINE(
-                "Surface %ux%u size=%u align=%u pitch=%u",
-                buffer.surface.width,
-                buffer.surface.height,
-                buffer.surface.imageSize,
-                buffer.surface.alignment,
-                buffer.surface.pitch);
-
-
-        buffer.surface.image = MEMAllocFromMappedMemoryForGX2Ex(buffer.surface.imageSize, buffer.surface.alignment);
+        GX2CalcSurfaceSizeAndAlignment(&captureSurface);
 
         DEBUG_FUNCTION_LINE(
-                "Allocated image=%p",
-                buffer.surface.image);
+                "Capture surface %ux%u size=%u align=%u pitch=%u",
+                captureSurface.width,
+                captureSurface.height,
+                captureSurface.imageSize,
+                captureSurface.alignment,
+                captureSurface.pitch);
 
+        captureSurface.image = MEMAllocFromMappedMemoryForGX2Ex(captureSurface.imageSize, captureSurface.alignment);
 
-        if (!buffer.surface.image)
+        if (!captureSurface.image) {
+            DEBUG_FUNCTION_LINE("Failed to allocate capture surface");
+
             return false;
+        }
 
+        GX2InitColorBufferRegs(
+                &surface.buffer);
 
-        GX2InitColorBufferRegs(&buffer);
+        // Persistent AA resolve surface
+        GX2Surface *aa = &surface.aaResolve;
 
+        memset(aa, 0, sizeof(GX2Surface));
+
+        aa->use       = (GX2SurfaceUse) (GX2_SURFACE_USE_COLOR_BUFFER | GX2_SURFACE_USE_TEXTURE);
+        aa->dim       = GX2_SURFACE_DIM_TEXTURE_2D;
+        aa->width     = gWidth;
+        aa->height    = gHeight;
+        aa->depth     = 1;
+        aa->mipLevels = 1;
+        aa->format    = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
+        aa->aa        = GX2_AA_MODE1X;
+        aa->tileMode  = GX2_TILE_MODE_LINEAR_ALIGNED;
+
+        GX2CalcSurfaceSizeAndAlignment(aa);
+
+        aa->image = MEMAllocFromMappedMemoryForGX2Ex(aa->imageSize, aa->alignment);
+
+        if (!aa->image) {
+            MEMFreeToMappedMemory(captureSurface.image);
+
+            captureSurface.image = nullptr;
+
+            DEBUG_FUNCTION_LINE("Failed to allocate AA resolve surface");
+
+            return false;
+        }
+
+        surface.busy         = false;
+        surface.width        = captureSurface.width;
+        surface.height       = captureSurface.height;
+        surface.pitch        = captureSurface.pitch;
+        surface.gpuTimestamp = 0;
 
         return true;
     }
@@ -133,7 +185,32 @@ namespace StreamMii {
 
         OSUnlockMutex(&frameMutex);
 
+        if (result) {
+            CaptureSurface &surface =
+                    sCapturePool[out.poolIndex];
+
+            if (surface.gpuTimestamp > 0) {
+                GX2WaitTimeStamp(surface.gpuTimestamp);
+            }
+
+            GX2Invalidate(
+                    GX2_INVALIDATE_MODE_CPU,
+                    surface.buffer.surface.image,
+                    surface.buffer.surface.imageSize);
+        }
+
         return result;
+    }
+
+    void ReleaseFrame(const FrameMessage &frame) {
+        if (frame.poolIndex >= CAPTURE_POOL_SIZE)
+            return;
+
+        OSLockMutex(&frameMutex);
+
+        sCapturePool[frame.poolIndex].busy = false;
+
+        OSUnlockMutex(&frameMutex);
     }
 
     void SetTVBuffer(void *buffer, uint32_t buffer_size, int32_t mode, GX2SurfaceFormat format, GX2BufferingMode buffering) {
@@ -162,82 +239,137 @@ namespace StreamMii {
         return sDRCBuffer;
     }
 
+    static bool InitializeCapturePool() {
+        DEBUG_FUNCTION_LINE(
+                "Initializing capture surface pool");
+
+        for (uint32_t i = 0;
+             i < CAPTURE_POOL_SIZE;
+             i++) {
+
+            if (!CreateCaptureSurface(
+                        sCapturePool[i])) {
+
+                DEBUG_FUNCTION_LINE(
+                        "Failed to create capture surface %u",
+                        i);
+
+                // Clean up surfaces that were successfully created before the failure
+                for (uint32_t j = 0;
+                     j < i;
+                     j++) {
+
+                    CaptureSurface &surface =
+                            sCapturePool[j];
+
+                    if (surface.buffer.surface.image) {
+                        MEMFreeToMappedMemory(
+                                surface.buffer.surface.image);
+
+                        surface.buffer.surface.image =
+                                nullptr;
+                    }
+
+                    if (surface.aaResolve.image) {
+                        MEMFreeToMappedMemory(
+                                surface.aaResolve.image);
+
+                        surface.aaResolve.image =
+                                nullptr;
+                    }
+
+                    memset(
+                            &surface,
+                            0,
+                            sizeof(CaptureSurface));
+                }
+
+                return false;
+            }
+        }
+
+        sCaptureWriteIndex = 0;
+
+        DEBUG_FUNCTION_LINE(
+                "Capture surface pool initialized");
+
+        return true;
+    }
+
     void InitCapture() {
         if (initialized)
             return;
 
-        switch (gCompressionMode) {
-            case CompressionMode::JPEG:
-                sBytesPerPixel = 4;
-                break;
-
-            default:
-                sBytesPerPixel = 2;
-                break;
-        }
-
-        OSInitMutex(&frameMutex);
-
-        for (uint32_t i = 0; i < BUFFER_COUNT; i++) {
-            sFrameCopies[i] =
-                    (uint8_t *) MEMAllocFromMappedMemoryForGX2Ex(
-                            gWidth * gHeight * sBytesPerPixel,
-                            0x100);
-
-            if (!sFrameCopies[i]) {
-                DEBUG_FUNCTION_LINE(
-                        "Frame buffer failed %u",
-                        i);
-                return;
-            }
-
-            sFrameUsed[i] = false;
-        }
-
         initialized = true;
 
-        DEBUG_FUNCTION_LINE(
-                "Capture system initialized");
+        DEBUG_FUNCTION_LINE("Capture system initialized");
     }
 
     void ShutdownCapture() {
         if (!initialized)
             return;
 
-        OSLockMutex(&frameMutex);
+        OSLockMutex(
+                &frameMutex);
 
         if (latestReady) {
-            ReleaseBuffer(latestFrame.buffer);
+
+            if (latestFrame.poolIndex <
+                CAPTURE_POOL_SIZE) {
+
+                sCapturePool[latestFrame.poolIndex].busy = false;
+            }
+
             latestReady = false;
-            memset(&latestFrame, 0, sizeof(FrameMessage));
+
+            memset(
+                    &latestFrame,
+                    0,
+                    sizeof(FrameMessage));
         }
 
         OSUnlockMutex(&frameMutex);
 
-        for (uint32_t i = 0; i < BUFFER_COUNT; i++) {
-            if (sFrameCopies[i]) {
-                MEMFreeToMappedMemory(sFrameCopies[i]);
-                sFrameCopies[i] = nullptr;
+        // Free every persistent capture surface
+        for (uint32_t i = 0; i < CAPTURE_POOL_SIZE; i++) {
+
+            CaptureSurface &surface =
+                    sCapturePool[i];
+
+            if (surface.buffer.surface.image) {
+
+                MEMFreeToMappedMemory(
+                        surface.buffer.surface.image);
+
+                surface.buffer.surface.image =
+                        nullptr;
             }
 
-            sFrameUsed[i] = false;
-        }
+            if (surface.aaResolve.image) {
 
-        if (sCaptureBuffer.surface.image) {
-            MEMFreeToMappedMemory(sCaptureBuffer.surface.image);
+                MEMFreeToMappedMemory(
+                        surface.aaResolve.image);
+
+                surface.aaResolve.image =
+                        nullptr;
+            }
 
             memset(
-                    &sCaptureBuffer,
+                    &surface,
                     0,
-                    sizeof(GX2ColorBuffer));
+                    sizeof(CaptureSurface));
         }
+
+        sCaptureWriteIndex = 0;
+
+        poolInitialized = false;
 
         DEBUG_FUNCTION_LINE("Capture shutdown");
 
         initialized = false;
     }
 
-    void CaptureFrame(const GX2ColorBuffer *colorBuffer) {
+    void CaptureFrame(const GX2ColorBuffer *colorBuffer, GX2SurfaceFormat scanFormat) {
         if (!gEnabled)
             return;
 
@@ -259,20 +391,8 @@ namespace StreamMii {
             return;
         }
 
-        if (!sCaptureBuffer.surface.image) {
-            if (!CreateCaptureBuffer(sCaptureBuffer)) {
-                DEBUG_FUNCTION_LINE(
-                        "GX2 buffer creation failed");
-                return;
-            }
-
-            DEBUG_FUNCTION_LINE(
-                    "GX2 capture buffer ready");
-        }
-
         if (!colorBuffer->surface.image) {
-            DEBUG_FUNCTION_LINE(
-                    "Invalid surface image");
+            DEBUG_FUNCTION_LINE("Invalid surface image");
             return;
         }
 
@@ -280,88 +400,91 @@ namespace StreamMii {
             return;
         }
 
-        GX2Invalidate(GX2_INVALIDATE_MODE_CPU, sCaptureBuffer.surface.image, sCaptureBuffer.surface.imageSize);
-        if (colorBuffer->surface.aa != GX2_AA_MODE1X) {
-            GX2Surface resolvedSurface = colorBuffer->surface;
-
-            resolvedSurface.aa = GX2_AA_MODE1X;
-            GX2CalcSurfaceSizeAndAlignment(&resolvedSurface);
-
-            resolvedSurface.image =
-                    MEMAllocFromMappedMemoryForGX2Ex(resolvedSurface.imageSize, resolvedSurface.alignment);
-
-            if (!resolvedSurface.image) {
-                DEBUG_FUNCTION_LINE(
-                        "Failed allocating AA resolve surface");
+        if (!poolInitialized) {
+            if (!InitializeCapturePool()) {
+                DEBUG_FUNCTION_LINE("Capture pool initialization failed");
                 return;
             }
 
-            GX2ResolveAAColorBuffer(
-                    colorBuffer,
-                    &resolvedSurface,
-                    colorBuffer->viewMip,
-                    colorBuffer->viewFirstSlice);
+            poolInitialized = true;
+        }
 
-            GX2CopySurface(
-                    &resolvedSurface,
-                    0,
-                    0,
-                    &sCaptureBuffer.surface,
-                    0,
-                    0);
+        CaptureSurface *surface = GetFreeCaptureSurface();
 
-            MEMFreeToMappedMemory(resolvedSurface.image);
-        } else {
+        if (!surface) {
+            sDroppedFrames++;
+            if (sDroppedFrames % 30 == 0) {
+                DEBUG_FUNCTION_LINE("Dropped frames due to full pool: %u", sDroppedFrames);
+            }
+            return;
+        }
+
+        GX2Invalidate(
+                GX2_INVALIDATE_MODE_CPU,
+                surface->buffer.surface.image,
+                surface->buffer.surface.imageSize);
+
+        // Submit GPU Copy
+        if (colorBuffer->surface.aa == GX2_AA_MODE1X) {
             GX2CopySurface(
                     &colorBuffer->surface,
                     colorBuffer->viewMip,
                     colorBuffer->viewFirstSlice,
-                    &sCaptureBuffer.surface,
+                    &surface->buffer.surface,
+                    0,
+                    0);
+        } else {
+            GX2ResolveAAColorBuffer(
+                    colorBuffer,
+                    &surface->aaResolve,
+                    0,
+                    0);
+
+            GX2CopySurface(
+                    &surface->aaResolve,
+                    0,
+                    0,
+                    &surface->buffer.surface,
                     0,
                     0);
         }
 
-        /*
+        GX2Invalidate(
+                GX2_INVALIDATE_MODE_COLOR_BUFFER,
+                surface->buffer.surface.image,
+                surface->buffer.surface.imageSize);
 
-    This code may not be necessary
+        GX2Flush();
 
-    Flush out destinations caches
-    GX2Invalidate(GX2_INVALIDATE_MODE_COLOR_BUFFER, colorBuffer->surface.image,colorBuffer->surface.imageSize);
+        surface->gpuTimestamp = GX2GetLastSubmittedTimeStamp();
 
-    Wait until GPU finished writing
-    GX2DrawDone();
-    */
+        surface->busy = true;
 
-        uint8_t *buffer = GetFreeBuffer();
+        uint32_t poolIndex =
+                static_cast<uint32_t>(
+                        surface - sCapturePool);
 
-        if (!buffer) {
-            DEBUG_FUNCTION_LINE("No free frame buffer");
-            return;
-        }
+        FrameMessage msg = {};
 
-        uint8_t *src = (uint8_t *) sCaptureBuffer.surface.image;
+        msg.poolIndex = poolIndex;
+        msg.buffer    = surface->buffer.surface.image;
+        msg.width     = gWidth;
+        msg.height    = gHeight;
+        msg.needsSRGB = (scanFormat & 0x400) != 0;
 
-        uint8_t *dst = (uint8_t *) buffer;
+        const uint32_t bytesPerPixel = GetCaptureBytesPerPixel();
 
-        for (uint32_t y = 0; y < gHeight; y++) {
-            memcpy(
-                    dst + y * gWidth * sBytesPerPixel,
-                    src + y * sCaptureBuffer.surface.pitch * sBytesPerPixel,
-                    gWidth * sBytesPerPixel);
-        }
+        // GX2 pitch is in pixels/elements
+        // Convert it to bytes only when sending it as a byte stride
+        msg.pitch = surface->buffer.surface.pitch * bytesPerPixel;
 
-        FrameMessage msg;
-
-        msg.buffer = buffer;
-        msg.size   = gWidth * gHeight * sBytesPerPixel;
-        msg.width  = gWidth;
-        msg.height = gHeight;
-        msg.pitch  = gWidth * sBytesPerPixel;
+        // The capture buffer is laid out as pitch bytes per row
+        msg.size = msg.pitch * msg.height;
 
         OSLockMutex(&frameMutex);
 
         if (latestReady) {
-            ReleaseBuffer(latestFrame.buffer);
+            sCapturePool[latestFrame.poolIndex].busy = false;
         }
 
         latestFrame = msg;

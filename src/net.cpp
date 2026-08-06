@@ -33,6 +33,8 @@ namespace StreamMii {
 
             uint8_t compression;
             uint8_t keyframe;
+
+            uint8_t needsSRGB;
         };
 #pragma pack(pop)
 
@@ -100,7 +102,7 @@ namespace StreamMii {
         }
 
 
-        bool SendFrame(const void *buffer, uint32_t size, uint32_t width, uint32_t height, uint32_t pitch, Compression compression, bool keyframe) {
+        bool SendFrame(const void *buffer, uint32_t compressedSize, uint32_t originalSize, uint32_t width, uint32_t height, uint32_t pitch, Compression compression, bool keyframe, uint8_t needsSRGB) {
             if (socket_fd < 0)
                 return false;
 
@@ -115,22 +117,21 @@ namespace StreamMii {
             const uint8_t *data = (const uint8_t *) buffer;
 
 
-            uint16_t packets =
-                    (size + MAX_PAYLOAD - 1) / MAX_PAYLOAD;
+            uint16_t packets = (compressedSize + MAX_PAYLOAD - 1) / MAX_PAYLOAD;
 
             uint8_t packet[sizeof(PacketHeader) + MAX_PAYLOAD];
 
             DEBUG_FUNCTION_LINE(
                     "Frame %u compressed %u/%u bytes packets=%u",
                     frame,
-                    size,
-                    width * height * 2,
+                    compressedSize,
+                    originalSize,
                     packets);
 
             for (uint16_t i = 0; i < packets; i++) {
                 uint32_t offset = i * MAX_PAYLOAD;
 
-                uint32_t remaining = size - offset;
+                uint32_t remaining = compressedSize - offset;
 
                 uint32_t payload =
                         remaining > MAX_PAYLOAD ? MAX_PAYLOAD : remaining;
@@ -147,12 +148,14 @@ namespace StreamMii {
                 header.height = htons(height);
                 header.pitch  = htons(pitch);
 
-                header.compressedSize = htonl(size);
-                header.originalSize   = htonl(width * height * 2);
+                header.compressedSize = htonl(compressedSize);
+                header.originalSize   = htonl(originalSize);
 
                 header.payloadSize = htons(payload);
                 header.compression = static_cast<uint8_t>(compression);
                 header.keyframe    = keyframe ? 1 : 0;
+
+                header.needsSRGB = needsSRGB ? 1 : 0;
 
 
                 memcpy(packet, &header, sizeof(header));

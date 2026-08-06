@@ -13,9 +13,9 @@ DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer_hook, const GX2ColorBuffer *c
         return;
 
     if (StreamMii::gCaptureTarget == StreamMii::CaptureTarget::TV && scanTarget == GX2_SCAN_TARGET_TV) {
-        StreamMii::CaptureFrame(const_cast<GX2ColorBuffer *>(colorBuffer));
+        StreamMii::CaptureFrame(const_cast<GX2ColorBuffer *>(colorBuffer), StreamMii::GetTVBuffer().surface_format);
     } else if (StreamMii::gCaptureTarget == StreamMii::CaptureTarget::DRC && scanTarget == GX2_SCAN_TARGET_DRC) {
-        StreamMii::CaptureFrame(const_cast<GX2ColorBuffer *>(colorBuffer));
+        StreamMii::CaptureFrame(const_cast<GX2ColorBuffer *>(colorBuffer), StreamMii::GetDRCBuffer().surface_format);
     }
 }
 

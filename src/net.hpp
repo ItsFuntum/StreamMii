@@ -15,12 +15,14 @@ namespace StreamMii {
 
         bool SendFrame(
                 const void *buffer,
-                uint32_t size,
+                uint32_t compressedSize,
+                uint32_t originalSize,
                 uint32_t width,
                 uint32_t height,
                 uint32_t pitch,
                 Compression compression,
-                bool keyframe);
+                bool keyframe,
+                uint8_t needsSRGB);
 
         void Shutdown();
 

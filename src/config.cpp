@@ -377,7 +377,7 @@ namespace StreamMii {
                         {4, "15 FPS"},
                         {3, "20 FPS"},
                         {2, "30 FPS"},
-                        {1, "60 FPS"}};
+                        {1, "Uncapped"}};
 
         videoCategory.add(
                 WUPSConfigItemMultipleValues::CreateFromValue(
@@ -390,8 +390,8 @@ namespace StreamMii {
 
         constexpr WUPSConfigItemMultipleValues::ValuePair compressionOptions[] =
                 {
-                        {0, "LZ4"},
-                        {1, "JPEG"},
+                        {0, "LZ4 (RGB565)"},
+                        {1, "JPEG (RGB888)"},
                 };
 
         videoCategory.add(
