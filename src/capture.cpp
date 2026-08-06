@@ -29,7 +29,6 @@ namespace StreamMii {
 
     struct CaptureSurface {
         GX2ColorBuffer buffer;
-        GX2Surface aaResolve;
 
         bool busy;
         OSTime gpuTimestamp;
@@ -55,6 +54,30 @@ namespace StreamMii {
     static bool initialized     = false;
     static bool poolInitialized = false;
 
+    static GX2Surface sAAResolveSurface = {};
+    static bool sAAResolveInitialized   = false;
+
+
+    static bool CreateAAResolveSurface() {
+        memset(&sAAResolveSurface, 0, sizeof(sAAResolveSurface));
+
+        sAAResolveSurface.use = (GX2SurfaceUse) (GX2_SURFACE_USE_COLOR_BUFFER | GX2_SURFACE_USE_TEXTURE);
+
+        sAAResolveSurface.dim       = GX2_SURFACE_DIM_TEXTURE_2D;
+        sAAResolveSurface.width     = gWidth;
+        sAAResolveSurface.height    = gHeight;
+        sAAResolveSurface.depth     = 1;
+        sAAResolveSurface.mipLevels = 1;
+        sAAResolveSurface.format    = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
+        sAAResolveSurface.aa        = GX2_AA_MODE1X;
+        sAAResolveSurface.tileMode  = GX2_TILE_MODE_LINEAR_ALIGNED;
+
+        GX2CalcSurfaceSizeAndAlignment(&sAAResolveSurface);
+
+        sAAResolveSurface.image = MEMAllocFromMappedMemoryForGX2Ex(sAAResolveSurface.imageSize, sAAResolveSurface.alignment);
+
+        return sAAResolveSurface.image != nullptr;
+    }
 
     static uint32_t GetCaptureBytesPerPixel() {
         return gCompressionMode == CompressionMode::JPEG ? 4 : 2;
@@ -133,41 +156,6 @@ namespace StreamMii {
 
         GX2InitColorBufferRegs(
                 &surface.buffer);
-
-        // Persistent AA resolve surface
-        GX2Surface *aa = &surface.aaResolve;
-
-        memset(aa, 0, sizeof(GX2Surface));
-
-        aa->use       = (GX2SurfaceUse) (GX2_SURFACE_USE_COLOR_BUFFER | GX2_SURFACE_USE_TEXTURE);
-        aa->dim       = GX2_SURFACE_DIM_TEXTURE_2D;
-        aa->width     = gWidth;
-        aa->height    = gHeight;
-        aa->depth     = 1;
-        aa->mipLevels = 1;
-        aa->format    = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
-        aa->aa        = GX2_AA_MODE1X;
-        aa->tileMode  = GX2_TILE_MODE_LINEAR_ALIGNED;
-
-        GX2CalcSurfaceSizeAndAlignment(aa);
-
-        aa->image = MEMAllocFromMappedMemoryForGX2Ex(aa->imageSize, aa->alignment);
-
-        if (!aa->image) {
-            MEMFreeToMappedMemory(captureSurface.image);
-
-            captureSurface.image = nullptr;
-
-            DEBUG_FUNCTION_LINE("Failed to allocate AA resolve surface");
-
-            return false;
-        }
-
-        surface.busy         = false;
-        surface.width        = captureSurface.width;
-        surface.height       = captureSurface.height;
-        surface.pitch        = captureSurface.pitch;
-        surface.gpuTimestamp = 0;
 
         return true;
     }
@@ -270,14 +258,6 @@ namespace StreamMii {
                                 nullptr;
                     }
 
-                    if (surface.aaResolve.image) {
-                        MEMFreeToMappedMemory(
-                                surface.aaResolve.image);
-
-                        surface.aaResolve.image =
-                                nullptr;
-                    }
-
                     memset(
                             &surface,
                             0,
@@ -345,20 +325,17 @@ namespace StreamMii {
                         nullptr;
             }
 
-            if (surface.aaResolve.image) {
-
-                MEMFreeToMappedMemory(
-                        surface.aaResolve.image);
-
-                surface.aaResolve.image =
-                        nullptr;
-            }
-
             memset(
                     &surface,
                     0,
                     sizeof(CaptureSurface));
         }
+
+        if (sAAResolveSurface.image) {
+            MEMFreeToMappedMemory(sAAResolveSurface.image);
+            sAAResolveSurface.image = nullptr;
+        }
+        sAAResolveInitialized = false;
 
         sCaptureWriteIndex = 0;
 
@@ -434,14 +411,22 @@ namespace StreamMii {
                     0,
                     0);
         } else {
+            if (!sAAResolveInitialized) {
+                if (!CreateAAResolveSurface()) {
+                    DEBUG_FUNCTION_LINE("Failed to allocate AA resolve surface");
+                    return;
+                }
+                sAAResolveInitialized = true;
+            }
+
             GX2ResolveAAColorBuffer(
                     colorBuffer,
-                    &surface->aaResolve,
+                    &sAAResolveSurface,
                     0,
                     0);
 
             GX2CopySurface(
-                    &surface->aaResolve,
+                    &sAAResolveSurface,
                     0,
                     0,
                     &surface->buffer.surface,

@@ -25,20 +25,17 @@ namespace StreamMii {
 
     constexpr uint32_t STACK_SIZE = 64 * 1024;
 
-    static constexpr uint32_t MAX_FRAME_SIZE = 854 * 480 * 4;
 
-    static constexpr uint32_t MAX_COMPRESSED_SIZE = MAX_FRAME_SIZE + (MAX_FRAME_SIZE / 255) + 16;
-
-
-    static uint8_t compressedBuffer[MAX_COMPRESSED_SIZE];
     static unsigned char *jpegBuffer = nullptr;
 
     static tjhandle jpegHandle = nullptr;
 
     static uint32_t frameCounter = 0;
 
-    static uint8_t previousFrame[MAX_FRAME_SIZE];
-    static uint8_t deltaFrame[MAX_FRAME_SIZE];
+    static uint8_t *compressedBuffer = nullptr;
+    static uint8_t *previousFrame    = nullptr;
+    static uint8_t *deltaFrame       = nullptr;
+
     static bool havePrevious = false;
 
     static const uint8_t sRGBGammaLUT[256] = {
@@ -61,6 +58,15 @@ namespace StreamMii {
 
     Net::Compression packetCompression;
 
+
+    static uint32_t GetFrameSize() {
+        return gWidth * gHeight * 4;
+    }
+
+    static uint32_t GetMaxCompressedSize() {
+        uint32_t size = GetFrameSize();
+        return size + (size / 255) + 16;
+    }
 
     static int32_t NetworkThreadEntry(int32_t argc, const char **argv) {
         DEBUG_FUNCTION_LINE("Network thread started");
@@ -163,7 +169,7 @@ namespace StreamMii {
                             (const char *) input,
                             (char *) compressedBuffer,
                             frame.size,
-                            sizeof(compressedBuffer));
+                            GetMaxCompressedSize());
                 }
 
 
@@ -228,6 +234,25 @@ namespace StreamMii {
         if (!jpegHandle) {
             DEBUG_FUNCTION_LINE("TurboJPEG init failed");
             return false;
+        }
+
+        compressedBuffer = (uint8_t *) malloc(GetMaxCompressedSize());
+        previousFrame    = (uint8_t *) malloc(GetFrameSize());
+        deltaFrame       = (uint8_t *) malloc(GetFrameSize());
+        if (!compressedBuffer || !previousFrame || !deltaFrame) {
+            DEBUG_FUNCTION_LINE("Failed to allocate frame buffers");
+            if (compressedBuffer) {
+                free(compressedBuffer);
+                compressedBuffer = nullptr;
+            }
+            if (previousFrame) {
+                free(previousFrame);
+                previousFrame = nullptr;
+            }
+            if (deltaFrame) {
+                free(deltaFrame);
+                deltaFrame = nullptr;
+            }
         }
 
         networkThread = (OSThread *) memalign(0x20, sizeof(OSThread));
@@ -308,6 +333,14 @@ namespace StreamMii {
 
         networkStack  = nullptr;
         networkThread = nullptr;
+
+        free(compressedBuffer);
+        free(previousFrame);
+        free(deltaFrame);
+
+        compressedBuffer = nullptr;
+        previousFrame    = nullptr;
+        deltaFrame       = nullptr;
 
         havePrevious = false;
         frameCounter = 0;

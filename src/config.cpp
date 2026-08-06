@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "capture.hpp"
 #include "thread.hpp"
 
 #include <forward_list>
@@ -53,6 +54,7 @@ namespace StreamMii {
 
     WUPSButtonCombo_ComboHandle gDecreaseResolutionComboHandle;
     WUPSButtonCombo_ComboHandle gIncreaseResolutionComboHandle;
+    WUPSButtonCombo_ComboHandle gToggleEnabledComboHandle;
 
     constexpr WUPSButtonCombo_Buttons DEFAULT_DECREASE_COMBO =
             WUPS_BUTTON_COMBO_BUTTON_TV |
@@ -61,6 +63,10 @@ namespace StreamMii {
     constexpr WUPSButtonCombo_Buttons DEFAULT_INCREASE_COMBO =
             WUPS_BUTTON_COMBO_BUTTON_TV |
             WUPS_BUTTON_COMBO_BUTTON_ZR;
+
+    constexpr WUPSButtonCombo_Buttons DEFAULT_TOGGLE_ENABLED_COMBO =
+            WUPS_BUTTON_COMBO_BUTTON_TV |
+            WUPS_BUTTON_COMBO_BUTTON_R;
 
 
     void UpdateIPAddress() {
@@ -204,6 +210,25 @@ namespace StreamMii {
         }
     }
 
+    void ToggleEnabledCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void *) {
+        gEnabled = !gEnabled;
+
+        if (!gEnabled) {
+            StreamMii::ShutdownThread();
+            StreamMii::ShutdownCapture();
+            StreamMii::Net::Shutdown();
+        } else {
+            StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
+            StreamMii::InitCapture();
+            StreamMii::InitThread();
+        }
+
+        WUPSStorageAPI::Store("enabled", gEnabled);
+        WUPSStorageAPI::SaveStorage();
+
+        DEBUG_FUNCTION_LINE("StreamMii toggled via combo: %s", gEnabled ? "ENABLED" : "DISABLED");
+    }
+
     void fpsCallback(ConfigItemMultipleValues *, uint32_t value) {
         gFrameSkip = value;
 
@@ -244,6 +269,15 @@ namespace StreamMii {
             gDeltaEnabled = value;
         } else if (strcmp(item->identifier, "enabled") == 0) {
             gEnabled = value;
+            if (!gEnabled) {
+                StreamMii::ShutdownThread();
+                StreamMii::ShutdownCapture();
+                StreamMii::Net::Shutdown();
+            } else {
+                StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
+                StreamMii::InitCapture();
+                StreamMii::InitThread();
+            }
         }
 
         WUPSStorageAPI::Store(item->identifier, value);
@@ -455,6 +489,15 @@ namespace StreamMii {
                         gIncreaseResolutionComboHandle,
                         buttonComboCallback));
 
+        buttonComboCategory.add(
+                WUPSConfigItemButtonCombo::Create(
+                        "toggle_enabled_combo",
+                        "Toggle Enabled Combo",
+                        WUPS_BUTTON_COMBO_BUTTON_TV |
+                                WUPS_BUTTON_COMBO_BUTTON_R,
+                        gToggleEnabledComboHandle,
+                        buttonComboCallback));
+
         root.add(std::move(buttonComboCategory));
 
 
@@ -632,6 +675,44 @@ namespace StreamMii {
                     "Failed to register increase combo: error=%d status=%d",
                     increaseError,
                     increaseStatus);
+        }
+
+        WUPSButtonCombo_ComboStatus toggleStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
+
+        WUPSButtonCombo_Error toggleError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
+
+        auto toggleResult =
+                WUPSButtonComboAPI::CreateComboPressDown(
+                        "StreamMii: Toggle Enabled",
+                        DEFAULT_TOGGLE_ENABLED_COMBO,
+                        ToggleEnabledCallback,
+                        nullptr,
+                        toggleStatus,
+                        toggleError);
+
+        if (toggleResult &&
+            toggleError == WUPS_BUTTON_COMBO_ERROR_SUCCESS) {
+            gToggleEnabledComboHandle =
+                    toggleResult->getHandle();
+
+            DEBUG_FUNCTION_LINE(
+                    "Toggle combo: error=%d status=%d",
+                    toggleError,
+                    toggleStatus);
+
+            if (toggleStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_VALID) {
+                DEBUG_FUNCTION_LINE("Toggle combo is VALID and ACTIVE");
+            } else if (toggleStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_CONFLICT) {
+                DEBUG_FUNCTION_LINE("Toggle combo has a CONFLICT and is INACTIVE");
+            }
+
+            sButtonComboInstances.emplace_front(
+                    std::move(*toggleResult));
+        } else {
+            DEBUG_FUNCTION_LINE(
+                    "Failed to register toggle combo: error=%d status=%d",
+                    toggleError,
+                    toggleStatus);
         }
     }
 
