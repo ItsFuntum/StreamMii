@@ -17,13 +17,13 @@
 
 namespace StreamMii {
 
-    bool gEnabled = true;
+    bool gEnabled = false;
 
-    uint32_t gResolution = 1; // 320x180
-    uint32_t gWidth      = 320;
-    uint32_t gHeight     = 180;
+    uint32_t gResolution = 2; // 480x270
+    uint32_t gWidth      = 480;
+    uint32_t gHeight     = 270;
 
-    uint32_t gFrameSkip = 4; // 15 FPS Limit
+    uint32_t gFrameSkip = 1; // Uncapped frame rate (no skipping)
 
     bool gDeltaEnabled = false;
 
@@ -44,8 +44,8 @@ namespace StreamMii {
 
     CaptureTarget gCaptureTarget = CaptureTarget::TV;
 
-    CompressionMode gCompressionMode = CompressionMode::LZ4;
-    uint32_t compression             = 0;
+    CompressionMode gCompressionMode = CompressionMode::JPEG;
+    uint32_t compression             = 1;
 
     uint32_t gJPEGQuality = 70;
 
@@ -274,7 +274,7 @@ namespace StreamMii {
                 WUPSConfigItemBoolean::Create(
                         "enabled",
                         "Enable StreamMii",
-                        true,
+                        false,
                         gEnabled,
                         boolCallback));
 
@@ -364,7 +364,7 @@ namespace StreamMii {
                 WUPSConfigItemMultipleValues::CreateFromValue(
                         "resolution",
                         "Resolution",
-                        1,
+                        2,
                         gResolution,
                         resolutions,
                         resolutionCallback));
@@ -383,7 +383,7 @@ namespace StreamMii {
                 WUPSConfigItemMultipleValues::CreateFromValue(
                         "fps",
                         "Max Frame Rate",
-                        4,
+                        1,
                         gFrameSkip,
                         fpsOptions,
                         fpsCallback));
@@ -398,7 +398,7 @@ namespace StreamMii {
                 WUPSConfigItemMultipleValues::CreateFromValue(
                         "compression",
                         "Compression",
-                        0,
+                        1,
                         static_cast<uint32_t>(gCompressionMode),
                         compressionOptions,
                         compressionCallback));
@@ -471,7 +471,7 @@ namespace StreamMii {
         WUPSStorageAPI::GetOrStoreDefault(
                 "enabled",
                 gEnabled,
-                true);
+                false);
 
 
         WUPSStorageAPI::GetOrStoreDefault(
@@ -513,19 +513,19 @@ namespace StreamMii {
         WUPSStorageAPI::GetOrStoreDefault(
                 "resolution",
                 gResolution,
-                (uint32_t) 1);
+                (uint32_t) 2);
 
         resolutionCallback(nullptr, gResolution);
 
         WUPSStorageAPI::GetOrStoreDefault(
                 "fps",
                 gFrameSkip,
-                (uint32_t) 4);
+                (uint32_t) 1);
 
         WUPSStorageAPI::GetOrStoreDefault(
                 "compression",
                 compression,
-                (uint32_t) 0);
+                (uint32_t) 1);
 
         gCompressionMode = static_cast<CompressionMode>(compression);
 
