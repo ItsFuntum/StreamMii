@@ -46,15 +46,15 @@ ON_APPLICATION_START() {
         StreamMii::ShutdownThread();
         StreamMii::ShutdownCapture();
         StreamMii::Net::Shutdown();
+        initialized = false;
     }
 
-    StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
-
-    StreamMii::InitCapture();
-
-    StreamMii::InitThread();
-
-    initialized = true;
+    if (StreamMii::gEnabled) {
+        StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
+        StreamMii::InitCapture();
+        StreamMii::InitThread();
+        initialized = true;
+    }
 }
 
 ON_APPLICATION_ENDS() {

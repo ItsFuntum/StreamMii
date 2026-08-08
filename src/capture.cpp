@@ -57,24 +57,19 @@ namespace StreamMii {
     static GX2Surface sAAResolveSurface = {};
     static bool sAAResolveInitialized   = false;
 
+    static constexpr uint32_t JPEG_SIMD_OVERREAD_PADDING = 64;
 
-    static bool CreateAAResolveSurface() {
-        memset(&sAAResolveSurface, 0, sizeof(sAAResolveSurface));
 
-        sAAResolveSurface.use = (GX2SurfaceUse) (GX2_SURFACE_USE_COLOR_BUFFER | GX2_SURFACE_USE_TEXTURE);
-
-        sAAResolveSurface.dim       = GX2_SURFACE_DIM_TEXTURE_2D;
-        sAAResolveSurface.width     = gWidth;
-        sAAResolveSurface.height    = gHeight;
-        sAAResolveSurface.depth     = 1;
-        sAAResolveSurface.mipLevels = 1;
-        sAAResolveSurface.format    = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
-        sAAResolveSurface.aa        = GX2_AA_MODE1X;
-        sAAResolveSurface.tileMode  = GX2_TILE_MODE_LINEAR_ALIGNED;
+    static bool CreateAAResolveSurface(const GX2Surface &sourceSurface) {
+        sAAResolveSurface = sourceSurface;
+        sAAResolveSurface.aa = GX2_AA_MODE1X;
 
         GX2CalcSurfaceSizeAndAlignment(&sAAResolveSurface);
 
-        sAAResolveSurface.image = MEMAllocFromMappedMemoryForGX2Ex(sAAResolveSurface.imageSize, sAAResolveSurface.alignment);
+        sAAResolveSurface.image = MEMAllocFromMappedMemoryForGX2Ex(
+            sAAResolveSurface.imageSize + JPEG_SIMD_OVERREAD_PADDING,
+            sAAResolveSurface.alignment
+        );
 
         return sAAResolveSurface.image != nullptr;
     }
@@ -146,7 +141,7 @@ namespace StreamMii {
                 captureSurface.alignment,
                 captureSurface.pitch);
 
-        captureSurface.image = MEMAllocFromMappedMemoryForGX2Ex(captureSurface.imageSize, captureSurface.alignment);
+        captureSurface.image = MEMAllocFromMappedMemoryForGX2Ex(captureSurface.imageSize + JPEG_SIMD_OVERREAD_PADDING, captureSurface.alignment);
 
         if (!captureSurface.image) {
             DEBUG_FUNCTION_LINE("Failed to allocate capture surface");
@@ -280,6 +275,8 @@ namespace StreamMii {
         if (initialized)
             return;
 
+        OSInitMutex(&frameMutex);
+
         initialized = true;
 
         DEBUG_FUNCTION_LINE("Capture system initialized");
@@ -411,8 +408,12 @@ namespace StreamMii {
                     0,
                     0);
         } else {
-            if (!sAAResolveInitialized) {
-                if (!CreateAAResolveSurface()) {
+            if (!sAAResolveInitialized || sAAResolveSurface.format != colorBuffer->surface.format) {
+                if (sAAResolveSurface.image) {
+                    MEMFreeToMappedMemory(sAAResolveSurface.image);
+                    sAAResolveSurface.image = nullptr;
+                }
+                if (!CreateAAResolveSurface(colorBuffer->surface)) {
                     DEBUG_FUNCTION_LINE("Failed to allocate AA resolve surface");
                     return;
                 }
@@ -422,8 +423,8 @@ namespace StreamMii {
             GX2ResolveAAColorBuffer(
                     colorBuffer,
                     &sAAResolveSurface,
-                    0,
-                    0);
+                    colorBuffer->viewMip,
+                    colorBuffer->viewFirstSlice);
 
             GX2CopySurface(
                     &sAAResolveSurface,
