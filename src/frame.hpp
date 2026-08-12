@@ -1,5 +1,7 @@
 #pragma once
 
+#include "config.hpp"
+
 #include <stdint.h>
 
 struct FrameMessage {
@@ -13,4 +15,6 @@ struct FrameMessage {
     uint32_t pitch;
 
     bool needsSRGB;
+
+    StreamMii::CompressionMode compressionMode;
 };

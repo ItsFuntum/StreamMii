@@ -87,7 +87,7 @@ namespace StreamMii {
             if (GetLatestFrame(frame)) {
                 const uint8_t *current = static_cast<const uint8_t *>(frame.buffer);
 
-                if (frame.needsSRGB && gCompressionMode == CompressionMode::JPEG) {
+                if (frame.needsSRGB && frame.compressionMode == CompressionMode::JPEG) {
                     uint32_t *px32      = (uint32_t *) frame.buffer;
                     uint32_t pixelPitch = frame.pitch / 4; // pitch is in bytes; RGBA8 = 4 bytes/px
                     for (uint32_t y = 0; y < frame.height; y++) {
@@ -108,7 +108,7 @@ namespace StreamMii {
                 frameCounter++;
 
 
-                if (gCompressionMode == CompressionMode::JPEG) {
+                if (frame.compressionMode == CompressionMode::JPEG) {
                     packetCompression = Net::Compression::JPEG;
 
                     unsigned long jpegSize = 0;
@@ -143,7 +143,7 @@ namespace StreamMii {
                     const uint8_t *input = current;
 
                     bool useDelta =
-                            gCompressionMode == CompressionMode::LZ4 &&
+                            frame.compressionMode == CompressionMode::LZ4 &&
                             gDeltaEnabled &&
                             havePrevious &&
                             (frameCounter % gKeyframeInterval != 0);
@@ -175,7 +175,7 @@ namespace StreamMii {
 
                 if (compressedSize > 0) {
                     const uint8_t *output =
-                            (gCompressionMode == CompressionMode::JPEG)
+                            (frame.compressionMode == CompressionMode::JPEG)
                                     ? jpegBuffer
                                     : compressedBuffer;
 
@@ -189,7 +189,7 @@ namespace StreamMii {
                                 packetCompression,
                                 keyframe,
                                 frame.needsSRGB)) {
-                        if (gCompressionMode != CompressionMode::JPEG) {
+                        if (frame.compressionMode != CompressionMode::JPEG) {
                             memcpy(previousFrame, current, frame.size);
                             havePrevious = true;
                         }
@@ -197,7 +197,7 @@ namespace StreamMii {
                         havePrevious = false; // force a keyframe next time
                     }
 
-                    if (gCompressionMode == CompressionMode::JPEG) {
+                    if (frame.compressionMode == CompressionMode::JPEG) {
                         if (jpegBuffer) {
                             tjFree(jpegBuffer);
                             jpegBuffer = nullptr;

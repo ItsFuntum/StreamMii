@@ -61,15 +61,14 @@ namespace StreamMii {
 
 
     static bool CreateAAResolveSurface(const GX2Surface &sourceSurface) {
-        sAAResolveSurface = sourceSurface;
+        sAAResolveSurface    = sourceSurface;
         sAAResolveSurface.aa = GX2_AA_MODE1X;
 
         GX2CalcSurfaceSizeAndAlignment(&sAAResolveSurface);
 
         sAAResolveSurface.image = MEMAllocFromMappedMemoryForGX2Ex(
-            sAAResolveSurface.imageSize + JPEG_SIMD_OVERREAD_PADDING,
-            sAAResolveSurface.alignment
-        );
+                sAAResolveSurface.imageSize + JPEG_SIMD_OVERREAD_PADDING,
+                sAAResolveSurface.alignment);
 
         return sAAResolveSurface.image != nullptr;
     }
@@ -80,15 +79,20 @@ namespace StreamMii {
 
     static CaptureSurface *GetFreeCaptureSurface() {
         OSLockMutex(&frameMutex);
+
         CaptureSurface *found = nullptr;
+
         for (uint32_t i = 0; i < CAPTURE_POOL_SIZE; i++) {
             uint32_t index = (sCaptureWriteIndex + i) % CAPTURE_POOL_SIZE;
+
             if (!sCapturePool[index].busy) {
-                sCaptureWriteIndex = (index + 1) % CAPTURE_POOL_SIZE;
-                found              = &sCapturePool[index];
+                sCapturePool[index].busy = true;
+                sCaptureWriteIndex       = (index + 1) % CAPTURE_POOL_SIZE;
+                found                    = &sCapturePool[index];
                 break;
             }
         }
+
         OSUnlockMutex(&frameMutex);
         return found;
     }
@@ -353,8 +357,11 @@ namespace StreamMii {
             return;
 
         if (gResolutionChanged || gCompressionChanged) {
+            ShutdownThread();
             ShutdownCapture();
+
             InitCapture();
+            InitThread();
 
             gResolutionChanged  = false;
             gCompressionChanged = false;
@@ -444,19 +451,18 @@ namespace StreamMii {
 
         surface->gpuTimestamp = GX2GetLastSubmittedTimeStamp();
 
-        surface->busy = true;
-
         uint32_t poolIndex =
                 static_cast<uint32_t>(
                         surface - sCapturePool);
 
         FrameMessage msg = {};
 
-        msg.poolIndex = poolIndex;
-        msg.buffer    = surface->buffer.surface.image;
-        msg.width     = gWidth;
-        msg.height    = gHeight;
-        msg.needsSRGB = (scanFormat & 0x400) != 0;
+        msg.poolIndex       = poolIndex;
+        msg.buffer          = surface->buffer.surface.image;
+        msg.width           = surface->buffer.surface.width;
+        msg.height          = surface->buffer.surface.height;
+        msg.needsSRGB       = (scanFormat & 0x400) != 0;
+        msg.compressionMode = gCompressionMode;
 
         const uint32_t bytesPerPixel = GetCaptureBytesPerPixel();
 
