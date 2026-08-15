@@ -3,7 +3,7 @@
 StreamMii is a Wii U plugin that captures and streams the TV or DRC (GamePad) display to a receiver over the network.
 
 > [!CAUTION]
-> The plugin can use a significant amount of system memory at higher capture resolutions. This is amplified when using JPEG compression, as the output is RGB888 instead of RGB565. You can reduce the capture resolution at any time using the **Decrease Capture Resolution** button combo (default: **TV + ZL**).
+> The plugin can use a significant amount of system memory at higher capture resolutions. This is amplified when using JPEG compression, as the output is RGB888 instead of RGB565. You can reduce the capture resolution at any time using the **Decrease Resolution** button combo (default: **TV + ZL**) or disable the plugin with the **Toggle Enabled** button combo (default: **TV + R**).
 
 ## Installation
 
@@ -11,6 +11,7 @@ StreamMii is a Wii U plugin that captures and streams the TV or DRC (GamePad) di
 
 1. Copy the file  `StreamMii.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
 2. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
+3. Requires the [NotificationModule](https://github.com/wiiu-env/NotificationModule) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 
 ## Usage
 
@@ -67,24 +68,23 @@ After installation:
 * LZ4 and JPEG compression (LZ4 outputs RGB565 and JPEG outputs RGB888)
 * Adjustable JPEG quality
 * Optional LZ4 delta encoding
-* Configurable button combos for changing the capture resolution
+* Configurable button combos for changing the capture resolution and toggling the plugin
 
 ## Button Combos
 
-The button combos used to change the capture resolution can be configured in the StreamMii config menu.
+The button combos can be configured in the StreamMii config menu.
 
 The default button combos are:
 
 * **TV + ZL**: Decrease capture resolution
 * **TV + ZR**: Increase capture resolution
+* **TV + R**: Toggle plugin
 
 ## Known Issues
 
-* Performance and stream quality isn't great. There are no plans to improve this due to the lack of hardware encoding.
+* Performance and stream quality may vary.
 
 * StreamMii does not stream certain applications and applets, such as Miiverse. Opening the HOME Menu or WUPS Config Menu also pauses the stream. Additionally, some games require workarounds for streaming. For example, **Super Smash Bros. for Wii U** requires the TV to be set to 720p mode for the plugin to stream correctly.
-
-* Some applications may produce different colors in the stream compared to what is displayed on the Wii U.
 
 ## Building
 

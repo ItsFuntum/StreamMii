@@ -20,19 +20,9 @@ namespace StreamMii {
 
     void ReleaseFrame(const FrameMessage &frame);
 
-    void SetTVBuffer(
-            void *buffer,
-            uint32_t buffer_size,
-            int32_t mode,
-            GX2SurfaceFormat format,
-            GX2BufferingMode buffering);
+    void SetTVBuffer(void *buffer, uint32_t buffer_size, int32_t mode, GX2SurfaceFormat format, GX2BufferingMode buffering);
 
-    void SetDRCBuffer(
-            void *buffer,
-            uint32_t buffer_size,
-            int32_t mode,
-            GX2SurfaceFormat format,
-            GX2BufferingMode buffering);
+    void SetDRCBuffer(void *buffer, uint32_t buffer_size, int32_t mode, GX2SurfaceFormat format, GX2BufferingMode buffering);
 
     const StoredBuffer &GetTVBuffer();
     const StoredBuffer &GetDRCBuffer();

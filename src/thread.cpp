@@ -115,18 +115,7 @@ namespace StreamMii {
 
                     jpegBuffer = nullptr;
 
-                    int result = tjCompress2(
-                            jpegHandle,
-                            current,
-                            frame.width,
-                            frame.pitch,
-                            frame.height,
-                            TJPF_RGBX,
-                            &jpegBuffer,
-                            &jpegSize,
-                            TJSAMP_420,
-                            gJPEGQuality,
-                            TJFLAG_FASTDCT);
+                    int result = tjCompress2(jpegHandle, current, frame.width, frame.pitch, frame.height, TJPF_RGBX, &jpegBuffer, &jpegSize, TJSAMP_420, gJPEGQuality, TJFLAG_FASTDCT);
 
 
                     if (result == 0) {
@@ -142,18 +131,10 @@ namespace StreamMii {
                 } else {
                     const uint8_t *input = current;
 
-                    bool useDelta =
-                            frame.compressionMode == CompressionMode::LZ4 &&
-                            gDeltaEnabled &&
-                            havePrevious &&
-                            (frameCounter % gKeyframeInterval != 0);
-
-
+                    bool useDelta = frame.compressionMode == CompressionMode::LZ4 && gDeltaEnabled && havePrevious && (frameCounter % gKeyframeInterval != 0);
                     if (useDelta) {
                         for (uint32_t i = 0; i < frame.size; i++) {
-                            deltaFrame[i] =
-                                    current[i] ^
-                                    previousFrame[i];
+                            deltaFrame[i] = current[i] ^ previousFrame[i];
                         }
 
                         input             = deltaFrame;
@@ -165,30 +146,14 @@ namespace StreamMii {
                     }
 
 
-                    compressedSize = LZ4_compress_default(
-                            (const char *) input,
-                            (char *) compressedBuffer,
-                            frame.size,
-                            GetMaxCompressedSize());
+                    compressedSize = LZ4_compress_default((const char *) input, (char *) compressedBuffer, frame.size, GetMaxCompressedSize());
                 }
 
 
                 if (compressedSize > 0) {
-                    const uint8_t *output =
-                            (frame.compressionMode == CompressionMode::JPEG)
-                                    ? jpegBuffer
-                                    : compressedBuffer;
+                    const uint8_t *output = (frame.compressionMode == CompressionMode::JPEG) ? jpegBuffer : compressedBuffer;
 
-                    if (Net::SendFrame(
-                                output,
-                                compressedSize,
-                                frame.size,
-                                frame.width,
-                                frame.height,
-                                frame.pitch,
-                                packetCompression,
-                                keyframe,
-                                frame.needsSRGB)) {
+                    if (Net::SendFrame(output, compressedSize, frame.size, frame.width, frame.height, frame.pitch, packetCompression, keyframe, frame.needsSRGB)) {
                         if (frame.compressionMode != CompressionMode::JPEG) {
                             memcpy(previousFrame, current, frame.size);
                             havePrevious = true;
@@ -206,8 +171,6 @@ namespace StreamMii {
                 } else {
                     havePrevious = false;
                 }
-
-
                 ReleaseFrame(frame);
             } else {
                 OSSleepTicks(OSMillisecondsToTicks(1));
@@ -215,8 +178,7 @@ namespace StreamMii {
         }
 
 
-        DEBUG_FUNCTION_LINE(
-                "Network thread stopped");
+        DEBUG_FUNCTION_LINE("Network thread stopped");
 
 
         return 0;
@@ -262,8 +224,7 @@ namespace StreamMii {
 
 
         if (!networkThread || !networkStack) {
-            DEBUG_FUNCTION_LINE(
-                    "Thread allocation failed");
+            DEBUG_FUNCTION_LINE("Thread allocation failed");
 
             return false;
         }
@@ -271,23 +232,10 @@ namespace StreamMii {
 
         running = true;
 
-        DEBUG_FUNCTION_LINE(
-                "Thread=%p Stack=%p",
-                networkThread,
-                networkStack);
+        DEBUG_FUNCTION_LINE("Thread=%p Stack=%p", networkThread, networkStack);
 
-        // Thread priority is low here
-        if (!OSCreateThread(
-                    networkThread,
-                    NetworkThreadEntry,
-                    0,
-                    nullptr,
-                    networkStack + STACK_SIZE,
-                    STACK_SIZE,
-                    21,
-                    OS_THREAD_ATTRIB_AFFINITY_ANY)) {
-            DEBUG_FUNCTION_LINE(
-                    "OSCreateThread failed");
+        if (!OSCreateThread(networkThread, NetworkThreadEntry, 0, nullptr, networkStack + STACK_SIZE, STACK_SIZE, 19, OS_THREAD_ATTRIB_AFFINITY_ANY)) {
+            DEBUG_FUNCTION_LINE("OSCreateThread failed");
 
             free(networkStack);
             free(networkThread);
@@ -301,9 +249,7 @@ namespace StreamMii {
         }
 
 
-        OSSetThreadName(
-                networkThread,
-                "StreamMii Network");
+        OSSetThreadName(networkThread, "StreamMii Network");
 
 
         OSResumeThread(networkThread);

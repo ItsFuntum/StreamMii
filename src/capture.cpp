@@ -66,9 +66,7 @@ namespace StreamMii {
 
         GX2CalcSurfaceSizeAndAlignment(&sAAResolveSurface);
 
-        sAAResolveSurface.image = MEMAllocFromMappedMemoryForGX2Ex(
-                sAAResolveSurface.imageSize + JPEG_SIMD_OVERREAD_PADDING,
-                sAAResolveSurface.alignment);
+        sAAResolveSurface.image = MEMAllocFromMappedMemoryForGX2Ex(sAAResolveSurface.imageSize + JPEG_SIMD_OVERREAD_PADDING, sAAResolveSurface.alignment);
 
         return sAAResolveSurface.image != nullptr;
     }
@@ -100,13 +98,9 @@ namespace StreamMii {
     static bool CreateCaptureSurface(CaptureSurface &surface) {
         memset(&surface, 0, sizeof(surface));
 
-        GX2Surface &captureSurface =
-                surface.buffer.surface;
+        GX2Surface &captureSurface = surface.buffer.surface;
 
-        memset(
-                &captureSurface,
-                0,
-                sizeof(GX2Surface));
+        memset(&captureSurface, 0, sizeof(GX2Surface));
 
         captureSurface.width  = gWidth;
         captureSurface.height = gHeight;
@@ -126,8 +120,7 @@ namespace StreamMii {
                 break;
         }
 
-        captureSurface.aa =
-                GX2_AA_MODE1X;
+        captureSurface.aa = GX2_AA_MODE1X;
 
         captureSurface.use = (GX2SurfaceUse) (GX2_SURFACE_USE_COLOR_BUFFER | GX2_SURFACE_USE_TEXTURE);
 
@@ -137,13 +130,7 @@ namespace StreamMii {
 
         GX2CalcSurfaceSizeAndAlignment(&captureSurface);
 
-        DEBUG_FUNCTION_LINE(
-                "Capture surface %ux%u size=%u align=%u pitch=%u",
-                captureSurface.width,
-                captureSurface.height,
-                captureSurface.imageSize,
-                captureSurface.alignment,
-                captureSurface.pitch);
+        DEBUG_FUNCTION_LINE("Capture surface %ux%u size=%u align=%u pitch=%u", captureSurface.width, captureSurface.height, captureSurface.imageSize, captureSurface.alignment, captureSurface.pitch);
 
         captureSurface.image = MEMAllocFromMappedMemoryForGX2Ex(captureSurface.imageSize + JPEG_SIMD_OVERREAD_PADDING, captureSurface.alignment);
 
@@ -153,8 +140,7 @@ namespace StreamMii {
             return false;
         }
 
-        GX2InitColorBufferRegs(
-                &surface.buffer);
+        GX2InitColorBufferRegs(&surface.buffer);
 
         return true;
     }
@@ -173,17 +159,13 @@ namespace StreamMii {
         OSUnlockMutex(&frameMutex);
 
         if (result) {
-            CaptureSurface &surface =
-                    sCapturePool[out.poolIndex];
+            CaptureSurface &surface = sCapturePool[out.poolIndex];
 
             if (surface.gpuTimestamp > 0) {
                 GX2WaitTimeStamp(surface.gpuTimestamp);
             }
 
-            GX2Invalidate(
-                    GX2_INVALIDATE_MODE_CPU,
-                    surface.buffer.surface.image,
-                    surface.buffer.surface.imageSize);
+            GX2Invalidate(GX2_INVALIDATE_MODE_CPU, surface.buffer.surface.image, surface.buffer.surface.imageSize);
         }
 
         return result;
@@ -227,40 +209,25 @@ namespace StreamMii {
     }
 
     static bool InitializeCapturePool() {
-        DEBUG_FUNCTION_LINE(
-                "Initializing capture surface pool");
+        DEBUG_FUNCTION_LINE("Initializing capture surface pool");
 
-        for (uint32_t i = 0;
-             i < CAPTURE_POOL_SIZE;
-             i++) {
+        for (uint32_t i = 0; i < CAPTURE_POOL_SIZE; i++) {
+            if (!CreateCaptureSurface(sCapturePool[i])) {
 
-            if (!CreateCaptureSurface(
-                        sCapturePool[i])) {
-
-                DEBUG_FUNCTION_LINE(
-                        "Failed to create capture surface %u",
-                        i);
+                DEBUG_FUNCTION_LINE("Failed to create capture surface %u", i);
 
                 // Clean up surfaces that were successfully created before the failure
-                for (uint32_t j = 0;
-                     j < i;
-                     j++) {
+                for (uint32_t j = 0; j < i; j++) {
 
-                    CaptureSurface &surface =
-                            sCapturePool[j];
+                    CaptureSurface &surface = sCapturePool[j];
 
                     if (surface.buffer.surface.image) {
-                        MEMFreeToMappedMemory(
-                                surface.buffer.surface.image);
+                        MEMFreeToMappedMemory(surface.buffer.surface.image);
 
-                        surface.buffer.surface.image =
-                                nullptr;
+                        surface.buffer.surface.image = nullptr;
                     }
 
-                    memset(
-                            &surface,
-                            0,
-                            sizeof(CaptureSurface));
+                    memset(&surface, 0, sizeof(CaptureSurface));
                 }
 
                 return false;
@@ -269,8 +236,7 @@ namespace StreamMii {
 
         sCaptureWriteIndex = 0;
 
-        DEBUG_FUNCTION_LINE(
-                "Capture surface pool initialized");
+        DEBUG_FUNCTION_LINE("Capture surface pool initialized");
 
         return true;
     }
@@ -290,46 +256,32 @@ namespace StreamMii {
         if (!initialized)
             return;
 
-        OSLockMutex(
-                &frameMutex);
+        OSLockMutex(&frameMutex);
 
         if (latestReady) {
 
-            if (latestFrame.poolIndex <
-                CAPTURE_POOL_SIZE) {
-
+            if (latestFrame.poolIndex < CAPTURE_POOL_SIZE) {
                 sCapturePool[latestFrame.poolIndex].busy = false;
             }
 
             latestReady = false;
 
-            memset(
-                    &latestFrame,
-                    0,
-                    sizeof(FrameMessage));
+            memset(&latestFrame, 0, sizeof(FrameMessage));
         }
 
         OSUnlockMutex(&frameMutex);
 
         // Free every persistent capture surface
         for (uint32_t i = 0; i < CAPTURE_POOL_SIZE; i++) {
-
-            CaptureSurface &surface =
-                    sCapturePool[i];
+            CaptureSurface &surface = sCapturePool[i];
 
             if (surface.buffer.surface.image) {
+                MEMFreeToMappedMemory(surface.buffer.surface.image);
 
-                MEMFreeToMappedMemory(
-                        surface.buffer.surface.image);
-
-                surface.buffer.surface.image =
-                        nullptr;
+                surface.buffer.surface.image = nullptr;
             }
 
-            memset(
-                    &surface,
-                    0,
-                    sizeof(CaptureSurface));
+            memset(&surface, 0, sizeof(CaptureSurface));
         }
 
         if (sAAResolveSurface.image) {
@@ -400,20 +352,11 @@ namespace StreamMii {
             return;
         }
 
-        GX2Invalidate(
-                GX2_INVALIDATE_MODE_CPU,
-                surface->buffer.surface.image,
-                surface->buffer.surface.imageSize);
+        GX2Invalidate(GX2_INVALIDATE_MODE_CPU, surface->buffer.surface.image, surface->buffer.surface.imageSize);
 
         // Submit GPU Copy
         if (colorBuffer->surface.aa == GX2_AA_MODE1X) {
-            GX2CopySurface(
-                    &colorBuffer->surface,
-                    colorBuffer->viewMip,
-                    colorBuffer->viewFirstSlice,
-                    &surface->buffer.surface,
-                    0,
-                    0);
+            GX2CopySurface(&colorBuffer->surface, colorBuffer->viewMip, colorBuffer->viewFirstSlice, &surface->buffer.surface, 0, 0);
         } else {
             if (!sAAResolveInitialized || sAAResolveSurface.format != colorBuffer->surface.format) {
                 if (sAAResolveSurface.image) {
@@ -427,33 +370,18 @@ namespace StreamMii {
                 sAAResolveInitialized = true;
             }
 
-            GX2ResolveAAColorBuffer(
-                    colorBuffer,
-                    &sAAResolveSurface,
-                    colorBuffer->viewMip,
-                    colorBuffer->viewFirstSlice);
+            GX2ResolveAAColorBuffer(colorBuffer, &sAAResolveSurface, colorBuffer->viewMip, colorBuffer->viewFirstSlice);
 
-            GX2CopySurface(
-                    &sAAResolveSurface,
-                    0,
-                    0,
-                    &surface->buffer.surface,
-                    0,
-                    0);
+            GX2CopySurface(&sAAResolveSurface, 0, 0, &surface->buffer.surface, 0, 0);
         }
 
-        GX2Invalidate(
-                GX2_INVALIDATE_MODE_COLOR_BUFFER,
-                surface->buffer.surface.image,
-                surface->buffer.surface.imageSize);
+        GX2Invalidate(GX2_INVALIDATE_MODE_COLOR_BUFFER, surface->buffer.surface.image, surface->buffer.surface.imageSize);
 
         GX2Flush();
 
         surface->gpuTimestamp = GX2GetLastSubmittedTimeStamp();
 
-        uint32_t poolIndex =
-                static_cast<uint32_t>(
-                        surface - sCapturePool);
+        uint32_t poolIndex = static_cast<uint32_t>(surface - sCapturePool);
 
         FrameMessage msg = {};
 

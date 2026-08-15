@@ -3,6 +3,7 @@
 #include "thread.hpp"
 
 #include <forward_list>
+#include <notifications/notifications.h>
 #include <string.h>
 #include <wups.h>
 #include <wups/button_combo/api.h>
@@ -56,28 +57,15 @@ namespace StreamMii {
     WUPSButtonCombo_ComboHandle gIncreaseResolutionComboHandle;
     WUPSButtonCombo_ComboHandle gToggleEnabledComboHandle;
 
-    constexpr WUPSButtonCombo_Buttons DEFAULT_DECREASE_COMBO =
-            WUPS_BUTTON_COMBO_BUTTON_TV |
-            WUPS_BUTTON_COMBO_BUTTON_ZL;
+    constexpr WUPSButtonCombo_Buttons DEFAULT_DECREASE_COMBO = WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_ZL;
 
-    constexpr WUPSButtonCombo_Buttons DEFAULT_INCREASE_COMBO =
-            WUPS_BUTTON_COMBO_BUTTON_TV |
-            WUPS_BUTTON_COMBO_BUTTON_ZR;
+    constexpr WUPSButtonCombo_Buttons DEFAULT_INCREASE_COMBO = WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_ZR;
 
-    constexpr WUPSButtonCombo_Buttons DEFAULT_TOGGLE_ENABLED_COMBO =
-            WUPS_BUTTON_COMBO_BUTTON_TV |
-            WUPS_BUTTON_COMBO_BUTTON_R;
+    constexpr WUPSButtonCombo_Buttons DEFAULT_TOGGLE_ENABLED_COMBO = WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_R;
 
 
     void UpdateIPAddress() {
-        snprintf(
-                gIP,
-                sizeof(gIP),
-                "%u.%u.%u.%u",
-                gIPFirstOctet,
-                gIPSecondOctet,
-                gIPThirdOctet,
-                gIPFourthOctet);
+        snprintf(gIP, sizeof(gIP), "%u.%u.%u.%u", gIPFirstOctet, gIPSecondOctet, gIPThirdOctet, gIPFourthOctet);
 
         gNetworkChanged = true;
     }
@@ -143,11 +131,7 @@ namespace StreamMii {
 
         WUPSStorageAPI::Store("capture_target", value);
 
-        DEBUG_FUNCTION_LINE(
-                "Capture target changed to %s",
-                gCaptureTarget == CaptureTarget::TV
-                        ? "TV"
-                        : "DRC");
+        DEBUG_FUNCTION_LINE("Capture target changed to %s", gCaptureTarget == CaptureTarget::TV ? "TV" : "DRC");
     }
 
     void SetResolution(uint32_t value) {
@@ -197,16 +181,26 @@ namespace StreamMii {
     void DecreaseResolutionCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void *) {
         if (gResolution > 0) {
             SetResolution(gResolution - 1);
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "StreamMii: Resolution decreased to %ux%u", gWidth, gHeight);
+            NotificationModule_AddInfoNotification(msg);
         } else {
             DEBUG_FUNCTION_LINE("Already at minimum resolution: %ux%u", gWidth, gHeight);
+            NotificationModule_AddInfoNotification("StreamMii: Already at minimum resolution");
         }
     }
 
     void IncreaseResolutionCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void *) {
         if (gResolution < 4) {
             SetResolution(gResolution + 1);
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "StreamMii: Resolution increased to %ux%u", gWidth, gHeight);
+            NotificationModule_AddInfoNotification(msg);
         } else {
             DEBUG_FUNCTION_LINE("Already at maximum resolution: %ux%u", gWidth, gHeight);
+            NotificationModule_AddInfoNotification("StreamMii: Already at maximum resolution");
         }
     }
 
@@ -225,6 +219,8 @@ namespace StreamMii {
 
         WUPSStorageAPI::Store("enabled", gEnabled);
         WUPSStorageAPI::SaveStorage();
+
+        NotificationModule_AddInfoNotification(gEnabled ? "StreamMii: Enabled" : "StreamMii: Disabled");
 
         DEBUG_FUNCTION_LINE("StreamMii toggled via combo: %s", gEnabled ? "ENABLED" : "DISABLED");
     }
@@ -257,10 +253,7 @@ namespace StreamMii {
 
 
     void buttonComboCallback(ConfigItemButtonCombo *item, uint32_t newValue) {
-        DEBUG_FUNCTION_LINE(
-                "Button combo changed: %s -> 0x%08X",
-                item->identifier,
-                newValue);
+        DEBUG_FUNCTION_LINE("Button combo changed: %s -> 0x%08X", item->identifier, newValue);
     }
 
 
@@ -304,67 +297,21 @@ namespace StreamMii {
     WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
         WUPSConfigCategory root(rootHandle);
 
-        root.add(
-                WUPSConfigItemBoolean::Create(
-                        "enabled",
-                        "Enable StreamMii",
-                        false,
-                        gEnabled,
-                        boolCallback));
+        root.add(WUPSConfigItemBoolean::Create("enabled", "Enable StreamMii", false, gEnabled, boolCallback));
 
 
         // Network Settings
         auto networkCategory = WUPSConfigCategory::Create("Network Settings");
 
-        networkCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "ip_first_octet",
-                        "Receiver IP - 1st Octet (e.g., 192)",
-                        192,
-                        gIPFirstOctet,
-                        0,
-                        255,
-                        ipFirstOctetCallback));
+        networkCategory.add(WUPSConfigItemIntegerRange::Create("ip_first_octet", "Receiver IP - 1st Octet (e.g., 192)", 192, gIPFirstOctet, 0, 255, ipFirstOctetCallback));
 
-        networkCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "ip_second_octet",
-                        "Receiver IP - 2nd Octet (e.g., 168)",
-                        168,
-                        gIPSecondOctet,
-                        0,
-                        255,
-                        ipSecondOctetCallback));
+        networkCategory.add(WUPSConfigItemIntegerRange::Create("ip_second_octet", "Receiver IP - 2nd Octet (e.g., 168)", 168, gIPSecondOctet, 0, 255, ipSecondOctetCallback));
 
-        networkCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "ip_third_octet",
-                        "Receiver IP - 3rd Octet (e.g., 1)",
-                        1,
-                        gIPThirdOctet,
-                        0,
-                        255,
-                        ipThirdOctetCallback));
+        networkCategory.add(WUPSConfigItemIntegerRange::Create("ip_third_octet", "Receiver IP - 3rd Octet (e.g., 1)", 1, gIPThirdOctet, 0, 255, ipThirdOctetCallback));
 
-        networkCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "ip_fourth_octet",
-                        "Receiver IP - 4th Octet (e.g., 100)",
-                        100,
-                        gIPFourthOctet,
-                        0,
-                        255,
-                        ipFourthOctetCallback));
+        networkCategory.add(WUPSConfigItemIntegerRange::Create("ip_fourth_octet", "Receiver IP - 4th Octet (e.g., 100)", 100, gIPFourthOctet, 0, 255, ipFourthOctetCallback));
 
-        networkCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "port",
-                        "Port",
-                        4242,
-                        gPort,
-                        1024,
-                        9999,
-                        integerCallback));
+        networkCategory.add(WUPSConfigItemIntegerRange::Create("port", "Port", 4242, gPort, 1024, 9999, integerCallback));
 
         root.add(std::move(networkCategory));
 
@@ -377,14 +324,7 @@ namespace StreamMii {
                         {0, "TV"},
                         {1, "DRC"}};
 
-        videoCategory.add(
-                WUPSConfigItemMultipleValues::CreateFromValue(
-                        "capture_target",
-                        "Capture Target",
-                        0,
-                        static_cast<uint32_t>(gCaptureTarget),
-                        captureTargetOptions,
-                        captureTargetCallback));
+        videoCategory.add(WUPSConfigItemMultipleValues::CreateFromValue("capture_target", "Capture Target", 0, static_cast<uint32_t>(gCaptureTarget), captureTargetOptions, captureTargetCallback));
 
         constexpr WUPSConfigItemMultipleValues::ValuePair resolutions[] =
                 {
@@ -394,14 +334,7 @@ namespace StreamMii {
                         {3, "640x360"},
                         {4, "854x480"}};
 
-        videoCategory.add(
-                WUPSConfigItemMultipleValues::CreateFromValue(
-                        "resolution",
-                        "Resolution",
-                        2,
-                        gResolution,
-                        resolutions,
-                        resolutionCallback));
+        videoCategory.add(WUPSConfigItemMultipleValues::CreateFromValue("resolution", "Resolution", 2, gResolution, resolutions, resolutionCallback));
 
         constexpr WUPSConfigItemMultipleValues::ValuePair fpsOptions[] =
                 {
@@ -413,14 +346,7 @@ namespace StreamMii {
                         {2, "30 FPS"},
                         {1, "Uncapped"}};
 
-        videoCategory.add(
-                WUPSConfigItemMultipleValues::CreateFromValue(
-                        "fps",
-                        "Max Frame Rate",
-                        1,
-                        gFrameSkip,
-                        fpsOptions,
-                        fpsCallback));
+        videoCategory.add(WUPSConfigItemMultipleValues::CreateFromValue("fps", "Max Frame Rate", 1, gFrameSkip, fpsOptions, fpsCallback));
 
         constexpr WUPSConfigItemMultipleValues::ValuePair compressionOptions[] =
                 {
@@ -428,42 +354,13 @@ namespace StreamMii {
                         {1, "JPEG (RGB888)"},
                 };
 
-        videoCategory.add(
-                WUPSConfigItemMultipleValues::CreateFromValue(
-                        "compression",
-                        "Compression",
-                        1,
-                        static_cast<uint32_t>(gCompressionMode),
-                        compressionOptions,
-                        compressionCallback));
+        videoCategory.add(WUPSConfigItemMultipleValues::CreateFromValue("compression", "Compression", 1, static_cast<uint32_t>(gCompressionMode), compressionOptions, compressionCallback));
 
-        videoCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "jpeg_quality",
-                        "JPEG Quality",
-                        70,
-                        gJPEGQuality,
-                        10,
-                        100,
-                        jpegQualityCallback));
+        videoCategory.add(WUPSConfigItemIntegerRange::Create("jpeg_quality", "JPEG Quality", 70, gJPEGQuality, 10, 100, jpegQualityCallback));
 
-        videoCategory.add(
-                WUPSConfigItemBoolean::Create(
-                        "delta",
-                        "LZ4 Delta encoding",
-                        false,
-                        gDeltaEnabled,
-                        boolCallback));
+        videoCategory.add(WUPSConfigItemBoolean::Create("delta", "LZ4 Delta encoding", false, gDeltaEnabled, boolCallback));
 
-        videoCategory.add(
-                WUPSConfigItemIntegerRange::Create(
-                        "keyframe",
-                        "Keyframe interval",
-                        60,
-                        gKeyframeInterval,
-                        1,
-                        300,
-                        integerCallback));
+        videoCategory.add(WUPSConfigItemIntegerRange::Create("keyframe", "Keyframe interval", 60, gKeyframeInterval, 1, 300, integerCallback));
 
         root.add(std::move(videoCategory));
 
@@ -471,32 +368,11 @@ namespace StreamMii {
         // Button Combos
         auto buttonComboCategory = WUPSConfigCategory::Create("Button Combos");
 
-        buttonComboCategory.add(
-                WUPSConfigItemButtonCombo::Create(
-                        "decrease_resolution_combo",
-                        "Decrease Resolution Combo",
-                        WUPS_BUTTON_COMBO_BUTTON_TV |
-                                WUPS_BUTTON_COMBO_BUTTON_ZL,
-                        gDecreaseResolutionComboHandle,
-                        buttonComboCallback));
+        buttonComboCategory.add(WUPSConfigItemButtonCombo::Create("decrease_resolution_combo", "Decrease Resolution Combo", WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_ZL, gDecreaseResolutionComboHandle, buttonComboCallback));
 
-        buttonComboCategory.add(
-                WUPSConfigItemButtonCombo::Create(
-                        "increase_resolution_combo",
-                        "Increase Resolution Combo",
-                        WUPS_BUTTON_COMBO_BUTTON_TV |
-                                WUPS_BUTTON_COMBO_BUTTON_ZR,
-                        gIncreaseResolutionComboHandle,
-                        buttonComboCallback));
+        buttonComboCategory.add(WUPSConfigItemButtonCombo::Create("increase_resolution_combo", "Increase Resolution Combo", WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_ZR, gIncreaseResolutionComboHandle, buttonComboCallback));
 
-        buttonComboCategory.add(
-                WUPSConfigItemButtonCombo::Create(
-                        "toggle_enabled_combo",
-                        "Toggle Enabled Combo",
-                        WUPS_BUTTON_COMBO_BUTTON_TV |
-                                WUPS_BUTTON_COMBO_BUTTON_R,
-                        gToggleEnabledComboHandle,
-                        buttonComboCallback));
+        buttonComboCategory.add(WUPSConfigItemButtonCombo::Create("toggle_enabled_combo", "Toggle Enabled Combo", WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_R, gToggleEnabledComboHandle, buttonComboCallback));
 
         root.add(std::move(buttonComboCategory));
 
@@ -506,133 +382,77 @@ namespace StreamMii {
 
 
     void InitConfig() {
-        WUPSConfigAPIOptionsV1 options =
-                {
-                        .name = "StreamMii"};
+        WUPSConfigAPIOptionsV1 options = {.name = "StreamMii"};
 
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "enabled",
-                gEnabled,
-                false);
+        WUPSStorageAPI::GetOrStoreDefault("enabled", gEnabled, false);
 
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "ip_first_octet",
-                gIPFirstOctet,
-                (uint32_t) 192);
+        WUPSStorageAPI::GetOrStoreDefault("ip_first_octet", gIPFirstOctet, (uint32_t) 192);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "ip_second_octet",
-                gIPSecondOctet,
-                (uint32_t) 168);
+        WUPSStorageAPI::GetOrStoreDefault("ip_second_octet", gIPSecondOctet, (uint32_t) 168);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "ip_third_octet",
-                gIPThirdOctet,
-                (uint32_t) 1);
+        WUPSStorageAPI::GetOrStoreDefault("ip_third_octet", gIPThirdOctet, (uint32_t) 1);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "ip_fourth_octet",
-                gIPFourthOctet,
-                (uint32_t) 100);
+        WUPSStorageAPI::GetOrStoreDefault("ip_fourth_octet", gIPFourthOctet, (uint32_t) 100);
 
         UpdateIPAddress();
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "port",
-                gPort,
-                (uint32_t) 4242);
+
+        WUPSStorageAPI::GetOrStoreDefault("port", gPort, (uint32_t) 4242);
+
 
         uint32_t captureTarget = 0;
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "capture_target",
-                captureTarget,
-                (uint32_t) 0);
+        WUPSStorageAPI::GetOrStoreDefault("capture_target", captureTarget, (uint32_t) 0);
 
         gCaptureTarget = static_cast<CaptureTarget>(captureTarget);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "resolution",
-                gResolution,
-                (uint32_t) 2);
+
+        WUPSStorageAPI::GetOrStoreDefault("resolution", gResolution, (uint32_t) 2);
 
         resolutionCallback(nullptr, gResolution);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "fps",
-                gFrameSkip,
-                (uint32_t) 1);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "compression",
-                compression,
-                (uint32_t) 1);
+        WUPSStorageAPI::GetOrStoreDefault("fps", gFrameSkip, (uint32_t) 1);
+
+
+        WUPSStorageAPI::GetOrStoreDefault("compression", compression, (uint32_t) 1);
 
         gCompressionMode = static_cast<CompressionMode>(compression);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "jpeg_quality",
-                gJPEGQuality,
-                (uint32_t) 70);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "keyframe",
-                gKeyframeInterval,
-                (uint32_t) 60);
+        WUPSStorageAPI::GetOrStoreDefault("jpeg_quality", gJPEGQuality, (uint32_t) 70);
 
-        WUPSStorageAPI::GetOrStoreDefault(
-                "delta",
-                gDeltaEnabled,
-                false);
+        WUPSStorageAPI::GetOrStoreDefault("keyframe", gKeyframeInterval, (uint32_t) 60);
+
+        WUPSStorageAPI::GetOrStoreDefault("delta", gDeltaEnabled, false);
 
 
-        WUPSConfigAPI_Init(
-                options,
-                ConfigMenuOpenedCallback,
-                ConfigMenuClosedCallback);
+        WUPSConfigAPI_Init(options, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
 
 
         WUPSButtonCombo_ComboStatus decreaseStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
 
         WUPSButtonCombo_Error decreaseError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
 
-        auto decreaseResult =
-                WUPSButtonComboAPI::CreateComboPressDown(
-                        "StreamMii: Decrease Resolution",
-                        DEFAULT_DECREASE_COMBO,
-                        DecreaseResolutionCallback,
-                        nullptr,
-                        decreaseStatus,
-                        decreaseError);
+        auto decreaseResult = WUPSButtonComboAPI::CreateComboPressDown("StreamMii: Decrease Resolution", DEFAULT_DECREASE_COMBO, DecreaseResolutionCallback, nullptr, decreaseStatus, decreaseError);
 
-        if (decreaseResult &&
-            decreaseError == WUPS_BUTTON_COMBO_ERROR_SUCCESS) {
-            gDecreaseResolutionComboHandle =
-                    decreaseResult->getHandle();
+        if (decreaseResult && decreaseError == WUPS_BUTTON_COMBO_ERROR_SUCCESS) {
+            gDecreaseResolutionComboHandle = decreaseResult->getHandle();
 
-            DEBUG_FUNCTION_LINE(
-                    "Decrease combo: error=%d status=%d",
-                    decreaseError,
-                    decreaseStatus);
+            DEBUG_FUNCTION_LINE("Decrease combo: error=%d status=%d", decreaseError, decreaseStatus);
 
             if (decreaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_VALID) {
-                DEBUG_FUNCTION_LINE(
-                        "Decrease combo is VALID and ACTIVE");
+                DEBUG_FUNCTION_LINE("Decrease combo is VALID and ACTIVE");
             } else if (decreaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_CONFLICT) {
-                DEBUG_FUNCTION_LINE(
-                        "Decrease combo has a CONFLICT and is INACTIVE");
+                DEBUG_FUNCTION_LINE("Decrease combo has a CONFLICT and is INACTIVE");
             }
 
             // Keep the ButtonCombo object alive.
-            sButtonComboInstances.emplace_front(
-                    std::move(*decreaseResult));
+            sButtonComboInstances.emplace_front(std::move(*decreaseResult));
         } else {
-            DEBUG_FUNCTION_LINE(
-                    "Failed to register decrease combo: error=%d status=%d",
-                    decreaseError,
-                    decreaseStatus);
+            DEBUG_FUNCTION_LINE("Failed to register decrease combo: error=%d status=%d", decreaseError, decreaseStatus);
         }
 
 
@@ -640,65 +460,35 @@ namespace StreamMii {
 
         WUPSButtonCombo_Error increaseError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
 
-        auto increaseResult =
-                WUPSButtonComboAPI::CreateComboPressDown(
-                        "StreamMii: Increase Resolution",
-                        DEFAULT_INCREASE_COMBO,
-                        IncreaseResolutionCallback,
-                        nullptr,
-                        increaseStatus,
-                        increaseError);
+        auto increaseResult = WUPSButtonComboAPI::CreateComboPressDown("StreamMii: Increase Resolution", DEFAULT_INCREASE_COMBO, IncreaseResolutionCallback, nullptr, increaseStatus, increaseError);
 
-        if (increaseResult &&
-            increaseError == WUPS_BUTTON_COMBO_ERROR_SUCCESS) {
-            gIncreaseResolutionComboHandle =
-                    increaseResult->getHandle();
+        if (increaseResult && increaseError == WUPS_BUTTON_COMBO_ERROR_SUCCESS) {
+            gIncreaseResolutionComboHandle = increaseResult->getHandle();
 
-            DEBUG_FUNCTION_LINE(
-                    "Increase combo: error=%d status=%d",
-                    increaseError,
-                    increaseStatus);
+            DEBUG_FUNCTION_LINE("Increase combo: error=%d status=%d", increaseError, increaseStatus);
 
             if (increaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_VALID) {
-                DEBUG_FUNCTION_LINE(
-                        "Increase combo is VALID and ACTIVE");
+                DEBUG_FUNCTION_LINE("Increase combo is VALID and ACTIVE");
             } else if (increaseStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_CONFLICT) {
-                DEBUG_FUNCTION_LINE(
-                        "Increase combo has a CONFLICT and is INACTIVE");
+                DEBUG_FUNCTION_LINE("Increase combo has a CONFLICT and is INACTIVE");
             }
 
             // Keep the ButtonCombo object alive.
-            sButtonComboInstances.emplace_front(
-                    std::move(*increaseResult));
+            sButtonComboInstances.emplace_front(std::move(*increaseResult));
         } else {
-            DEBUG_FUNCTION_LINE(
-                    "Failed to register increase combo: error=%d status=%d",
-                    increaseError,
-                    increaseStatus);
+            DEBUG_FUNCTION_LINE("Failed to register increase combo: error=%d status=%d", increaseError, increaseStatus);
         }
 
         WUPSButtonCombo_ComboStatus toggleStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
 
         WUPSButtonCombo_Error toggleError = WUPS_BUTTON_COMBO_ERROR_UNKNOWN_ERROR;
 
-        auto toggleResult =
-                WUPSButtonComboAPI::CreateComboPressDown(
-                        "StreamMii: Toggle Enabled",
-                        DEFAULT_TOGGLE_ENABLED_COMBO,
-                        ToggleEnabledCallback,
-                        nullptr,
-                        toggleStatus,
-                        toggleError);
+        auto toggleResult = WUPSButtonComboAPI::CreateComboPressDown("StreamMii: Toggle Enabled", DEFAULT_TOGGLE_ENABLED_COMBO, ToggleEnabledCallback, nullptr, toggleStatus, toggleError);
 
-        if (toggleResult &&
-            toggleError == WUPS_BUTTON_COMBO_ERROR_SUCCESS) {
-            gToggleEnabledComboHandle =
-                    toggleResult->getHandle();
+        if (toggleResult && toggleError == WUPS_BUTTON_COMBO_ERROR_SUCCESS) {
+            gToggleEnabledComboHandle = toggleResult->getHandle();
 
-            DEBUG_FUNCTION_LINE(
-                    "Toggle combo: error=%d status=%d",
-                    toggleError,
-                    toggleStatus);
+            DEBUG_FUNCTION_LINE("Toggle combo: error=%d status=%d", toggleError, toggleStatus);
 
             if (toggleStatus == WUPS_BUTTON_COMBO_COMBO_STATUS_VALID) {
                 DEBUG_FUNCTION_LINE("Toggle combo is VALID and ACTIVE");
@@ -706,15 +496,10 @@ namespace StreamMii {
                 DEBUG_FUNCTION_LINE("Toggle combo has a CONFLICT and is INACTIVE");
             }
 
-            sButtonComboInstances.emplace_front(
-                    std::move(*toggleResult));
+            sButtonComboInstances.emplace_front(std::move(*toggleResult));
         } else {
-            DEBUG_FUNCTION_LINE(
-                    "Failed to register toggle combo: error=%d status=%d",
-                    toggleError,
-                    toggleStatus);
+            DEBUG_FUNCTION_LINE("Failed to register toggle combo: error=%d status=%d", toggleError, toggleStatus);
         }
     }
-
 
 } // namespace StreamMii

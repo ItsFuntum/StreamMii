@@ -43,10 +43,7 @@ namespace StreamMii {
 
 
         bool Init(const char *ip, uint16_t port) {
-            socket_fd = socket(
-                    AF_INET,
-                    SOCK_DGRAM,
-                    IPPROTO_UDP);
+            socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
             if (socket_fd < 0) {
                 DEBUG_FUNCTION_LINE("Socket failed");
@@ -55,24 +52,13 @@ namespace StreamMii {
 
             int sndbuf = 512 * 1024;
 
-            setsockopt(
-                    socket_fd,
-                    SOL_SOCKET,
-                    SO_SNDBUF,
-                    &sndbuf,
-                    sizeof(sndbuf));
+            setsockopt(socket_fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
 
             int flags = fcntl(socket_fd, F_GETFL, 0);
 
-            fcntl(
-                    socket_fd,
-                    F_SETFL,
-                    flags | O_NONBLOCK);
+            fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK);
 
-            memset(
-                    &destination,
-                    0,
-                    sizeof(destination));
+            memset(&destination, 0, sizeof(destination));
 
 
             destination.sin_family = AF_INET;
@@ -80,22 +66,16 @@ namespace StreamMii {
 
 
             if (inet_aton(ip, &destination.sin_addr) == 0) {
-                DEBUG_FUNCTION_LINE(
-                        "Invalid IP address: %s",
-                        ip);
+                DEBUG_FUNCTION_LINE("Invalid IP address: %s", ip);
 
                 return false;
             }
 
 
-            DEBUG_FUNCTION_LINE(
-                    "Sending to %s:%d",
-                    ip,
-                    port);
+            DEBUG_FUNCTION_LINE("Sending to %s:%d", ip, port);
 
 
-            DEBUG_FUNCTION_LINE(
-                    "Network initialized");
+            DEBUG_FUNCTION_LINE("Network initialized");
 
 
             return true;
@@ -121,20 +101,14 @@ namespace StreamMii {
 
             uint8_t packet[sizeof(PacketHeader) + MAX_PAYLOAD];
 
-            DEBUG_FUNCTION_LINE(
-                    "Frame %u compressed %u/%u bytes packets=%u",
-                    frame,
-                    compressedSize,
-                    originalSize,
-                    packets);
+            DEBUG_FUNCTION_LINE("Frame %u compressed %u/%u bytes packets=%u", frame, compressedSize, originalSize, packets);
 
             for (uint16_t i = 0; i < packets; i++) {
                 uint32_t offset = i * MAX_PAYLOAD;
 
                 uint32_t remaining = compressedSize - offset;
 
-                uint32_t payload =
-                        remaining > MAX_PAYLOAD ? MAX_PAYLOAD : remaining;
+                uint32_t payload = remaining > MAX_PAYLOAD ? MAX_PAYLOAD : remaining;
 
                 PacketHeader header;
 
@@ -163,13 +137,7 @@ namespace StreamMii {
 
                 memcpy(packet + sizeof(header), data + offset, payload);
 
-                int result = sendto(
-                        socket_fd,
-                        packet,
-                        sizeof(header) + payload,
-                        0,
-                        (sockaddr *) &destination,
-                        sizeof(destination));
+                int result = sendto(socket_fd, packet, sizeof(header) + payload, 0, (sockaddr *) &destination, sizeof(destination));
 
                 if (result < 0) {
                     if (errno == EWOULDBLOCK || errno == EAGAIN) {
@@ -177,9 +145,7 @@ namespace StreamMii {
                         continue;
                     }
 
-                    DEBUG_FUNCTION_LINE(
-                            "sendto failed errno=%d",
-                            errno);
+                    DEBUG_FUNCTION_LINE("sendto failed errno=%d", errno);
 
                     return false;
                 }
@@ -199,4 +165,5 @@ namespace StreamMii {
 
 
     } // namespace Net
+
 } // namespace StreamMii

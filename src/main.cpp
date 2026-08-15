@@ -3,8 +3,9 @@
 #include "net.hpp"
 #include "thread.hpp"
 #include "utils/logger.h"
-#include <gx2/display.h>
 
+#include <gx2/display.h>
+#include <notifications/notifications.h>
 #include <wups.h>
 
 
@@ -24,6 +25,8 @@ static bool initialized = false;
 INITIALIZE_PLUGIN() {
     initLogging();
 
+    NotificationModule_InitLibrary();
+
     StreamMii::InitConfig();
 
     DEBUG_FUNCTION_LINE("StreamMii initialized");
@@ -33,6 +36,8 @@ INITIALIZE_PLUGIN() {
 
 DEINITIALIZE_PLUGIN() {
     StreamMii::sButtonComboInstances.clear();
+
+    NotificationModule_DeInitLibrary();
 }
 
 ON_APPLICATION_START() {
