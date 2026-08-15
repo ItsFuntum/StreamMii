@@ -26,8 +26,6 @@ namespace StreamMii {
     constexpr uint32_t STACK_SIZE = 64 * 1024;
 
 
-    static unsigned char *jpegBuffer = nullptr;
-
     static tjhandle jpegHandle = nullptr;
 
     static uint32_t frameCounter = 0;
@@ -57,6 +55,18 @@ namespace StreamMii {
             0xF8, 0xF8, 0xF9, 0xF9, 0xFA, 0xFA, 0xFB, 0xFB, 0xFB, 0xFC, 0xFC, 0xFD, 0xFD, 0xFE, 0xFE, 0xFE};
 
     Net::Compression packetCompression;
+
+    static unsigned char *sJpegBuf = nullptr;
+    static uint32_t sJpegBufWidth = 0, sJpegBufHeight = 0;
+
+    static void EnsureJpegBuffer(uint32_t w, uint32_t h) {
+        if (sJpegBuf && sJpegBufWidth == w && sJpegBufHeight == h) return;
+        if (sJpegBuf) free(sJpegBuf);
+        unsigned long sz = tjBufSize((int)w, (int)h, TJSAMP_420);
+        sJpegBuf = (unsigned char *)malloc(sz);
+        sJpegBufWidth = w;
+        sJpegBufHeight = h;
+    }
 
 
     static uint32_t GetFrameSize() {
@@ -107,31 +117,24 @@ namespace StreamMii {
 
                 frameCounter++;
 
-
                 if (frame.compressionMode == CompressionMode::JPEG) {
                     packetCompression = Net::Compression::JPEG;
 
+                    EnsureJpegBuffer(frame.width, frame.height);
+
                     unsigned long jpegSize = 0;
+                    unsigned char *encodeBuf = sJpegBuf;
 
-                    jpegBuffer = nullptr;
-
-                    int result = tjCompress2(jpegHandle, current, frame.width, frame.pitch, frame.height, TJPF_RGBX, &jpegBuffer, &jpegSize, TJSAMP_420, gJPEGQuality, TJFLAG_FASTDCT);
-
+                    int result = tjCompress2(jpegHandle, current, frame.width, frame.pitch, frame.height, TJPF_RGBX, &encodeBuf, &jpegSize, TJSAMP_420, gJPEGQuality, TJFLAG_FASTDCT | TJFLAG_NOREALLOC);
 
                     if (result == 0) {
                         compressedSize = jpegSize;
-                    } else {
-                        DEBUG_FUNCTION_LINE("JPEG failed: %s", tjGetErrorStr());
-
-                        if (jpegBuffer) {
-                            tjFree(jpegBuffer);
-                            jpegBuffer = nullptr;
-                        }
                     }
                 } else {
                     const uint8_t *input = current;
 
                     bool useDelta = frame.compressionMode == CompressionMode::LZ4 && gDeltaEnabled && havePrevious && (frameCounter % gKeyframeInterval != 0);
+
                     if (useDelta) {
                         for (uint32_t i = 0; i < frame.size; i++) {
                             deltaFrame[i] = current[i] ^ previousFrame[i];
@@ -145,13 +148,11 @@ namespace StreamMii {
                         keyframe          = true;
                     }
 
-
                     compressedSize = LZ4_compress_default((const char *) input, (char *) compressedBuffer, frame.size, GetMaxCompressedSize());
                 }
 
-
                 if (compressedSize > 0) {
-                    const uint8_t *output = (frame.compressionMode == CompressionMode::JPEG) ? jpegBuffer : compressedBuffer;
+                    const uint8_t *output = (frame.compressionMode == CompressionMode::JPEG) ? sJpegBuf : compressedBuffer;
 
                     if (Net::SendFrame(output, compressedSize, frame.size, frame.width, frame.height, frame.pitch, packetCompression, keyframe, frame.needsSRGB)) {
                         if (frame.compressionMode != CompressionMode::JPEG) {
@@ -160,13 +161,6 @@ namespace StreamMii {
                         }
                     } else {
                         havePrevious = false; // force a keyframe next time
-                    }
-
-                    if (frame.compressionMode == CompressionMode::JPEG) {
-                        if (jpegBuffer) {
-                            tjFree(jpegBuffer);
-                            jpegBuffer = nullptr;
-                        }
                     }
                 } else {
                     havePrevious = false;
@@ -287,6 +281,11 @@ namespace StreamMii {
         compressedBuffer = nullptr;
         previousFrame    = nullptr;
         deltaFrame       = nullptr;
+
+        free(sJpegBuf);
+        sJpegBuf       = nullptr;
+        sJpegBufWidth  = 0;
+        sJpegBufHeight = 0;
 
         havePrevious = false;
         frameCounter = 0;
