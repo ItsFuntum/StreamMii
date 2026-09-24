@@ -11,7 +11,8 @@ StreamMii is a Wii U plugin that captures and streams the TV or DRC (GamePad) di
 
 1. Copy the file  `StreamMii.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
 2. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
-3. Requires the [NotificationModule](https://github.com/wiiu-env/NotificationModule) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
+3. Requires the [MemoryMappingModule](https://github.com/wiiu-env/MemoryMappingModule) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
+4. Requires the [NotificationModule](https://github.com/wiiu-env/NotificationModule) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 
 ## Usage
 
@@ -90,8 +91,10 @@ The default button combos are:
 
 For building you need:
 
-* [wups](https://github.com/Maschell/WiiUPluginSystem)
 * [wut](https://github.com/devkitpro/wut)
+* [wups](https://github.com/Maschell/WiiUPluginSystem)
+* [libmappedmemory](https://github.com/wiiu-env/libmappedmemory)
+* [libnotifications](https://github.com/wiiu-env/libnotifications)
 
 Install these dependencies according to their respective README files. Make sure to also install any dependencies required by the libraries themselves.
 
