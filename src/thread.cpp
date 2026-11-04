@@ -78,7 +78,7 @@ namespace StreamMii {
         return size + (size / 255) + 16;
     }
 
-    static int32_t NetworkThreadEntry(int32_t argc, const char **argv) {
+    static int NetworkThreadEntry(int argc, void *argv) {
         DEBUG_FUNCTION_LINE("Network thread started");
 
         while (running) {
