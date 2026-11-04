@@ -197,18 +197,19 @@ namespace StreamMii {
         deltaFrame       = (uint8_t *) malloc(GetFrameSize());
         if (!compressedBuffer || !previousFrame || !deltaFrame) {
             DEBUG_FUNCTION_LINE("Failed to allocate frame buffers");
-            if (compressedBuffer) {
-                free(compressedBuffer);
-                compressedBuffer = nullptr;
-            }
-            if (previousFrame) {
-                free(previousFrame);
-                previousFrame = nullptr;
-            }
-            if (deltaFrame) {
-                free(deltaFrame);
-                deltaFrame = nullptr;
-            }
+
+            free(compressedBuffer);
+            free(previousFrame);
+            free(deltaFrame);
+
+            compressedBuffer = nullptr;
+            previousFrame = nullptr;
+            deltaFrame = nullptr;
+
+            tjDestroy(jpegHandle);
+            jpegHandle = nullptr;
+
+            return false;
         }
 
         networkThread = (OSThread *) memalign(0x20, sizeof(OSThread));
