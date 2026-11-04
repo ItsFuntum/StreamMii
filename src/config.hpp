@@ -7,6 +7,7 @@
 namespace StreamMii {
 
     extern bool gEnabled;
+    extern bool gAutoStart;
 
     extern uint32_t gWidth;
     extern uint32_t gHeight;
@@ -45,5 +46,7 @@ namespace StreamMii {
 
 
     void InitConfig();
+
+    void SetEnabled(bool enabled);
 
 } // namespace StreamMii

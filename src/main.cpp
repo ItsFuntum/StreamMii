@@ -21,6 +21,47 @@ WUPS_USE_STORAGE("streammii");
 
 static bool initialized = false;
 
+namespace StreamMii {
+    void SetEnabled(bool enabled) {
+        if (gEnabled == enabled && initialized == enabled)
+            return;
+
+        if (!enabled) {
+            if (initialized) {
+                ShutdownThread();
+                ShutdownCapture();
+                Net::Shutdown();
+                initialized = false;
+            }
+
+            gEnabled = false;
+            return;
+        }
+
+        if (initialized) {
+            gEnabled = true;
+            return;
+        }
+
+        if (!Net::Init(gIP, gPort))
+            return;
+
+        InitCapture();
+
+        if (!InitThread()) {
+            ShutdownThread();
+            ShutdownCapture();
+            Net::Shutdown();
+            gEnabled = false;
+            return;
+        }
+
+        gEnabled    = true;
+        initialized = true;
+    }
+
+} // namespace StreamMii
+
 
 INITIALIZE_PLUGIN() {
     initLogging();
@@ -30,6 +71,8 @@ INITIALIZE_PLUGIN() {
     StreamMii::InitConfig();
 
     DEBUG_FUNCTION_LINE("StreamMii initialized");
+
+    StreamMii::SetEnabled(StreamMii::gAutoStart);
 
     deinitLogging();
 }
@@ -45,21 +88,11 @@ ON_APPLICATION_START() {
 
     DEBUG_FUNCTION_LINE("Application starting");
 
-    if (initialized) {
-        DEBUG_FUNCTION_LINE("Restarting StreamMii for new application");
-
-        StreamMii::ShutdownThread();
-        StreamMii::ShutdownCapture();
-        StreamMii::Net::Shutdown();
-        initialized = false;
+    if (StreamMii::gEnabled && !initialized) {
+        StreamMii::SetEnabled(true);
     }
 
-    if (StreamMii::gEnabled) {
-        StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
-        StreamMii::InitCapture();
-        StreamMii::InitThread();
-        initialized = true;
-    }
+    deinitLogging();
 }
 
 ON_APPLICATION_ENDS() {

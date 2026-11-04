@@ -19,7 +19,8 @@
 
 namespace StreamMii {
 
-    bool gEnabled = false;
+    bool gEnabled   = false;
+    bool gAutoStart = false;
 
     uint32_t gResolution = 2; // 480x270
     uint32_t gWidth      = 480;
@@ -205,24 +206,11 @@ namespace StreamMii {
     }
 
     void ToggleEnabledCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void *) {
-        gEnabled = !gEnabled;
+        SetEnabled(!gEnabled);
 
-        if (!gEnabled) {
-            StreamMii::ShutdownThread();
-            StreamMii::ShutdownCapture();
-            StreamMii::Net::Shutdown();
-        } else {
-            StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
-            StreamMii::InitCapture();
-            StreamMii::InitThread();
-        }
-
-        WUPSStorageAPI::Store("enabled", gEnabled);
         WUPSStorageAPI::SaveStorage();
 
         NotificationModule_AddInfoNotification(gEnabled ? "StreamMii: Enabled" : "StreamMii: Disabled");
-
-        DEBUG_FUNCTION_LINE("StreamMii toggled via combo: %s", gEnabled ? "ENABLED" : "DISABLED");
     }
 
     void fpsCallback(ConfigItemMultipleValues *, uint32_t value) {
@@ -260,17 +248,11 @@ namespace StreamMii {
     void boolCallback(ConfigItemBoolean *item, bool value) {
         if (strcmp(item->identifier, "delta") == 0) {
             gDeltaEnabled = value;
+        } else if (strcmp(item->identifier, "autostart") == 0) {
+            gAutoStart = value;
         } else if (strcmp(item->identifier, "enabled") == 0) {
-            gEnabled = value;
-            if (!gEnabled) {
-                StreamMii::ShutdownThread();
-                StreamMii::ShutdownCapture();
-                StreamMii::Net::Shutdown();
-            } else {
-                StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort);
-                StreamMii::InitCapture();
-                StreamMii::InitThread();
-            }
+            SetEnabled(value);
+            value = gEnabled;
         }
 
         WUPSStorageAPI::Store(item->identifier, value);
@@ -298,6 +280,8 @@ namespace StreamMii {
         WUPSConfigCategory root(rootHandle);
 
         root.add(WUPSConfigItemBoolean::Create("enabled", "Enable StreamMii", false, gEnabled, boolCallback));
+
+        root.add(WUPSConfigItemBoolean::Create("autostart", "Enable StreamMii on Console Startup", false, gAutoStart, boolCallback));
 
 
         // Network Settings
@@ -386,6 +370,8 @@ namespace StreamMii {
 
 
         WUPSStorageAPI::GetOrStoreDefault("enabled", gEnabled, false);
+
+        WUPSStorageAPI::GetOrStoreDefault("autostart", gAutoStart, false);
 
 
         WUPSStorageAPI::GetOrStoreDefault("ip_first_octet", gIPFirstOctet, (uint32_t) 192);

@@ -62,10 +62,10 @@ namespace StreamMii {
     static void EnsureJpegBuffer(uint32_t w, uint32_t h) {
         if (sJpegBuf && sJpegBufWidth == w && sJpegBufHeight == h) return;
         if (sJpegBuf) free(sJpegBuf);
-        unsigned long sz = tjBufSize((int)w, (int)h, TJSAMP_420);
-        sJpegBuf = (unsigned char *)malloc(sz);
-        sJpegBufWidth = w;
-        sJpegBufHeight = h;
+        unsigned long sz = tjBufSize((int) w, (int) h, TJSAMP_420);
+        sJpegBuf         = (unsigned char *) malloc(sz);
+        sJpegBufWidth    = w;
+        sJpegBufHeight   = h;
     }
 
 
@@ -122,7 +122,7 @@ namespace StreamMii {
 
                     EnsureJpegBuffer(frame.width, frame.height);
 
-                    unsigned long jpegSize = 0;
+                    unsigned long jpegSize   = 0;
                     unsigned char *encodeBuf = sJpegBuf;
 
                     int result = tjCompress2(jpegHandle, current, frame.width, frame.pitch, frame.height, TJPF_RGBX, &encodeBuf, &jpegSize, TJSAMP_420, gJPEGQuality, TJFLAG_FASTDCT | TJFLAG_NOREALLOC);
@@ -203,8 +203,8 @@ namespace StreamMii {
             free(deltaFrame);
 
             compressedBuffer = nullptr;
-            previousFrame = nullptr;
-            deltaFrame = nullptr;
+            previousFrame    = nullptr;
+            deltaFrame       = nullptr;
 
             tjDestroy(jpegHandle);
             jpegHandle = nullptr;
