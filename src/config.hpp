@@ -47,6 +47,8 @@ namespace StreamMii {
 
     void InitConfig();
 
+    void ShowStreamMiiNotification();
+
     void SetEnabled(bool enabled);
 
 } // namespace StreamMii

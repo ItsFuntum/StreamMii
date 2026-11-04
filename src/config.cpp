@@ -205,12 +205,28 @@ namespace StreamMii {
         }
     }
 
+    void ShowStreamMiiNotification() {
+        if (!gEnabled) {
+            NotificationModule_AddInfoNotification("StreamMii: Disabled");
+            return;
+        }
+
+        char msg[64];
+
+        // The capture hook usually runs at 60 FPS
+        uint32_t fps = gFrameSkip > 0 ? 60 / gFrameSkip : 60;
+
+        snprintf(msg, sizeof(msg), "StreamMii: Enabled | %ux%u | %u FPS", gWidth, gHeight, fps);
+
+        NotificationModule_AddInfoNotification(msg);
+    }
+
     void ToggleEnabledCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void *) {
         SetEnabled(!gEnabled);
 
         WUPSStorageAPI::SaveStorage();
 
-        NotificationModule_AddInfoNotification(gEnabled ? "StreamMii: Enabled" : "StreamMii: Disabled");
+        ShowStreamMiiNotification();
     }
 
     void fpsCallback(ConfigItemMultipleValues *, uint32_t value) {

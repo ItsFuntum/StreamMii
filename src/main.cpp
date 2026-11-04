@@ -92,6 +92,7 @@ ON_APPLICATION_START() {
 
     if (StreamMii::gEnabled && !initialized) {
         StreamMii::SetEnabled(true);
+        StreamMii::ShowStreamMiiNotification();
     }
 
     deinitLogging();
