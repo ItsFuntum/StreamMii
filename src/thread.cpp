@@ -12,6 +12,7 @@
 
 #include <coreinit/cache.h>
 
+#include <climits>
 #include <malloc.h>
 #include <string.h>
 
@@ -59,13 +60,55 @@ namespace StreamMii {
     static unsigned char *sJpegBuf = nullptr;
     static uint32_t sJpegBufWidth = 0, sJpegBufHeight = 0;
 
-    static void EnsureJpegBuffer(uint32_t w, uint32_t h) {
-        if (sJpegBuf && sJpegBufWidth == w && sJpegBufHeight == h) return;
-        if (sJpegBuf) free(sJpegBuf);
-        unsigned long sz = tjBufSize((int) w, (int) h, TJSAMP_420);
-        sJpegBuf         = (unsigned char *) malloc(sz);
-        sJpegBufWidth    = w;
-        sJpegBufHeight   = h;
+    static bool EnsureJpegBuffer(uint32_t w, uint32_t h) {
+        if (sJpegBuf && sJpegBufWidth == w && sJpegBufHeight == h)
+            return true;
+
+        if (w == 0 || h == 0 || w > INT_MAX || h > INT_MAX)
+            return false;
+
+        unsigned long sz = tjBufSize(static_cast<int>(w), static_cast<int>(h), TJSAMP_420);
+
+        if (sz == 0)
+            return false;
+
+        unsigned char *newBuffer = static_cast<unsigned char *>(malloc(sz));
+
+        if (!newBuffer)
+            return false;
+
+        free(sJpegBuf);
+
+        sJpegBuf       = newBuffer;
+        sJpegBufWidth  = w;
+        sJpegBufHeight = h;
+
+        return true;
+    }
+
+
+    static void CleanupThreadResources() {
+        if (jpegHandle) {
+            tjDestroy(jpegHandle);
+            jpegHandle = nullptr;
+        }
+
+        free(networkThread);
+        free(networkStack);
+        free(compressedBuffer);
+        free(previousFrame);
+        free(deltaFrame);
+        free(sJpegBuf);
+
+        networkThread    = nullptr;
+        networkStack     = nullptr;
+        compressedBuffer = nullptr;
+        previousFrame    = nullptr;
+        deltaFrame       = nullptr;
+        sJpegBuf         = nullptr;
+
+        sJpegBufWidth  = 0;
+        sJpegBufHeight = 0;
     }
 
 
@@ -120,7 +163,10 @@ namespace StreamMii {
                 if (frame.compressionMode == CompressionMode::JPEG) {
                     packetCompression = Net::Compression::JPEG;
 
-                    EnsureJpegBuffer(frame.width, frame.height);
+                    if (!EnsureJpegBuffer(frame.width, frame.height)) {
+                        ReleaseFrame(frame);
+                        continue;
+                    }
 
                     unsigned long jpegSize   = 0;
                     unsigned char *encodeBuf = sJpegBuf;
@@ -220,7 +266,7 @@ namespace StreamMii {
 
         if (!networkThread || !networkStack) {
             DEBUG_FUNCTION_LINE("Thread allocation failed");
-
+            CleanupThreadResources();
             return false;
         }
 
@@ -232,14 +278,8 @@ namespace StreamMii {
         if (!OSCreateThread(networkThread, NetworkThreadEntry, 0, nullptr, networkStack + STACK_SIZE, STACK_SIZE, 19, OS_THREAD_ATTRIB_AFFINITY_ANY)) {
             DEBUG_FUNCTION_LINE("OSCreateThread failed");
 
-            free(networkStack);
-            free(networkThread);
-
-            networkStack  = nullptr;
-            networkThread = nullptr;
-
             running = false;
-
+            CleanupThreadResources();
             return false;
         }
 
