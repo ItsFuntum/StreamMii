@@ -43,8 +43,10 @@ namespace StreamMii {
             return;
         }
 
-        if (!Net::Init(gIP, gPort))
+        if (!Net::Init(gIP, gPort)) {
+            gEnabled = false;
             return;
+        }
 
         InitCapture();
 
