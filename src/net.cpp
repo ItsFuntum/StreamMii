@@ -43,6 +43,9 @@ namespace StreamMii {
 
 
         bool Init(const char *ip, uint16_t port) {
+            if (socket_fd >= 0)
+                Shutdown();
+
             socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
             if (socket_fd < 0) {
@@ -67,7 +70,8 @@ namespace StreamMii {
 
             if (inet_aton(ip, &destination.sin_addr) == 0) {
                 DEBUG_FUNCTION_LINE("Invalid IP address: %s", ip);
-
+                close(socket_fd);
+                socket_fd = -1;
                 return false;
             }
 
@@ -97,11 +101,24 @@ namespace StreamMii {
             const uint8_t *data = (const uint8_t *) buffer;
 
 
-            uint16_t packets = (compressedSize + MAX_PAYLOAD - 1) / MAX_PAYLOAD;
+            if (!buffer || compressedSize == 0)
+                return false;
+
+            if (width > UINT16_MAX || height > UINT16_MAX || pitch > UINT16_MAX)
+                return false;
+
+            uint32_t packetCount = (compressedSize + MAX_PAYLOAD - 1) / MAX_PAYLOAD;
+
+            if (packetCount > UINT16_MAX)
+                return false;
+
+            uint16_t packets = static_cast<uint16_t>(packetCount);
 
             uint8_t packet[sizeof(PacketHeader) + MAX_PAYLOAD];
 
             DEBUG_FUNCTION_LINE("Frame %u compressed %u/%u bytes packets=%u", frame, compressedSize, originalSize, packets);
+
+            bool success = true;
 
             for (uint16_t i = 0; i < packets; i++) {
                 uint32_t offset = i * MAX_PAYLOAD;
@@ -142,6 +159,7 @@ namespace StreamMii {
                 if (result < 0) {
                     if (errno == EWOULDBLOCK || errno == EAGAIN) {
                         DEBUG_FUNCTION_LINE("UDP buffer full, dropping packet");
+                        success = false;
                         continue;
                     }
 
@@ -152,7 +170,7 @@ namespace StreamMii {
             }
 
 
-            return true;
+            return success;
         }
 
 
