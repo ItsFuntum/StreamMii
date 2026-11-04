@@ -365,6 +365,7 @@ namespace StreamMii {
                 }
                 if (!CreateAAResolveSurface(colorBuffer->surface)) {
                     DEBUG_FUNCTION_LINE("Failed to allocate AA resolve surface");
+                    ReleaseFrame({ .poolIndex = static_cast<uint32_t>(surface - sCapturePool) });
                     return;
                 }
                 sAAResolveInitialized = true;
