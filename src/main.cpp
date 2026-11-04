@@ -90,8 +90,32 @@ ON_APPLICATION_START() {
 
     DEBUG_FUNCTION_LINE("Application starting");
 
-    if (StreamMii::gEnabled && !initialized) {
-        StreamMii::SetEnabled(true);
+    if (StreamMii::gEnabled) {
+        if (initialized) {
+            StreamMii::ShutdownThread();
+            StreamMii::ShutdownCapture();
+            StreamMii::Net::Shutdown();
+
+            initialized = false;
+        }
+
+        if (StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort)) {
+            StreamMii::InitCapture();
+
+            if (StreamMii::InitThread()) {
+                initialized = true;
+            } else {
+                StreamMii::ShutdownThread();
+                StreamMii::ShutdownCapture();
+                StreamMii::Net::Shutdown();
+                StreamMii::gEnabled = false;
+            }
+        } else {
+            StreamMii::gEnabled = false;
+        }
+    }
+
+    if (StreamMii::gEnabled && initialized) {
         StreamMii::ShowStreamMiiNotification();
     }
 
