@@ -213,10 +213,13 @@ namespace StreamMii {
 
         char msg[64];
 
-        // The capture hook usually runs at 60 FPS
-        uint32_t fps = gFrameSkip > 0 ? 60 / gFrameSkip : 60;
+        if (gFrameSkip == 1) {
+            snprintf(msg, sizeof(msg), "StreamMii: Enabled | %ux%u | Uncapped", gWidth, gHeight);
+        } else {
+            uint32_t fps = 60 / gFrameSkip;
 
-        snprintf(msg, sizeof(msg), "StreamMii: Enabled | %ux%u | %u FPS", gWidth, gHeight, fps);
+            snprintf(msg, sizeof(msg), "StreamMii: Enabled | %ux%u | %u FPS", gWidth, gHeight, fps);
+        }
 
         NotificationModule_AddInfoNotification(msg);
     }
