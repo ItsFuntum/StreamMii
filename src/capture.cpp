@@ -376,11 +376,14 @@ namespace StreamMii {
         if (colorBuffer->surface.aa == GX2_AA_MODE1X) {
             GX2CopySurface(&colorBuffer->surface, colorBuffer->viewMip, colorBuffer->viewFirstSlice, &surface->buffer.surface, 0, 0);
         } else {
-            if (!sAAResolveInitialized || sAAResolveSurface.format != colorBuffer->surface.format) {
+            if (!sAAResolveInitialized || sAAResolveSurface.format != colorBuffer->surface.format || sAAResolveSurface.width != colorBuffer->surface.width || sAAResolveSurface.height != colorBuffer->surface.height) {
                 if (sAAResolveSurface.image) {
                     MEMFreeToMappedMemory(sAAResolveSurface.image);
                     sAAResolveSurface.image = nullptr;
                 }
+
+                sAAResolveInitialized = false;
+
                 if (!CreateAAResolveSurface(colorBuffer->surface)) {
                     DEBUG_FUNCTION_LINE("Failed to allocate AA resolve surface");
                     ReleaseFrame({.poolIndex = static_cast<uint32_t>(surface - sCapturePool)});
