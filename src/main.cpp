@@ -100,7 +100,7 @@ ON_APPLICATION_START() {
 
         if (!StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort)) {
             StreamMii::gEnabled = false;
-            initialized = false;
+            initialized         = false;
         } else {
             StreamMii::InitCapture();
 
@@ -110,7 +110,7 @@ ON_APPLICATION_START() {
                 StreamMii::Net::Shutdown();
 
                 StreamMii::gEnabled = false;
-                initialized = false;
+                initialized         = false;
             } else {
                 initialized = true;
             }
