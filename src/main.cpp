@@ -90,33 +90,31 @@ ON_APPLICATION_START() {
 
     DEBUG_FUNCTION_LINE("Application starting");
 
-    if (StreamMii::gEnabled) {
-        if (initialized) {
-            StreamMii::ShutdownThread();
-            StreamMii::ShutdownCapture();
-            StreamMii::Net::Shutdown();
+    if (StreamMii::gEnabled && !initialized) {
+        StreamMii::SetEnabled(true);
+        StreamMii::ShowStreamMiiNotification();
+    } else if (StreamMii::gEnabled && initialized) {
+        StreamMii::ShutdownThread();
+        StreamMii::ShutdownCapture();
+        StreamMii::Net::Shutdown();
 
+        if (!StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort)) {
+            StreamMii::gEnabled = false;
             initialized = false;
-        }
-
-        if (StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort)) {
+        } else {
             StreamMii::InitCapture();
 
-            if (StreamMii::InitThread()) {
-                initialized = true;
-            } else {
+            if (!StreamMii::InitThread()) {
                 StreamMii::ShutdownThread();
                 StreamMii::ShutdownCapture();
                 StreamMii::Net::Shutdown();
-                StreamMii::gEnabled = false;
-            }
-        } else {
-            StreamMii::gEnabled = false;
-        }
-    }
 
-    if (StreamMii::gEnabled && initialized) {
-        StreamMii::ShowStreamMiiNotification();
+                StreamMii::gEnabled = false;
+                initialized = false;
+            } else {
+                initialized = true;
+            }
+        }
     }
 
     deinitLogging();
