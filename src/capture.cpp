@@ -309,11 +309,29 @@ namespace StreamMii {
             return;
 
         if (gResolutionChanged || gCompressionChanged) {
-            ShutdownThread();
-            ShutdownCapture();
+            if (StreamMii::gEnabled && initialized) {
+                StreamMii::ShutdownThread();
+                StreamMii::ShutdownCapture();
+                StreamMii::Net::Shutdown();
 
-            InitCapture();
-            InitThread();
+                if (!StreamMii::Net::Init(StreamMii::gIP, StreamMii::gPort)) {
+                    StreamMii::gEnabled = false;
+                    initialized         = false;
+                } else {
+                    StreamMii::InitCapture();
+
+                    if (!StreamMii::InitThread()) {
+                        StreamMii::ShutdownThread();
+                        StreamMii::ShutdownCapture();
+                        StreamMii::Net::Shutdown();
+
+                        StreamMii::gEnabled = false;
+                        initialized         = false;
+                    } else {
+                        initialized = true;
+                    }
+                }
+            }
 
             gResolutionChanged  = false;
             gCompressionChanged = false;
