@@ -388,8 +388,6 @@ namespace StreamMii {
         WUPSConfigAPIOptionsV1 options = {.name = "StreamMii"};
 
 
-        WUPSStorageAPI::GetOrStoreDefault("enabled", gEnabled, false);
-
         WUPSStorageAPI::GetOrStoreDefault("autostart", gAutoStart, false);
 
 

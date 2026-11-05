@@ -74,7 +74,10 @@ INITIALIZE_PLUGIN() {
 
     DEBUG_FUNCTION_LINE("StreamMii initialized");
 
-    StreamMii::SetEnabled(StreamMii::gAutoStart);
+    if (StreamMii::gAutoStart) {
+        StreamMii::SetEnabled(true);
+        StreamMii::ShowStreamMiiNotification();
+    }
 
     deinitLogging();
 }
